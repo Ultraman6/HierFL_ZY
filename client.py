@@ -32,34 +32,28 @@ class Client():
         # 一次本地更新不会超过 1000 次迭代
         for epoch in range(1000):
             # 使用私有数据进行训练
-            print("使用私有数据进行训练")
+            # print("使用私有数据进行训练")
             for data in self.train_loader:
                 inputs, labels = data
                 inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
                 loss += self.model.optimize_model(input_batch=inputs, label_batch=labels)
 
-                itered_num += 1
-                if itered_num >= num_iter:
-                    self.epoch += 1
-                    self.model.exp_lr_sheduler(epoch=self.epoch)
-                    return loss / itered_num  # 返回平均损失
+            # 继续使用共享数据进行训练
+            if self.share_dataloader != None:
+                # print("使用共享数据进行训练")
+                for data in self.share_dataloader:
+                    inputs, labels = data
+                    inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
+                    loss += self.model.optimize_model(input_batch=inputs, label_batch=labels)
 
-                # 继续使用共享数据进行训练
-                if self.share_dataloader != None:
-                    print("使用共享数据进行训练")
-                    for data in self.share_dataloader:
-                        inputs, labels = data
-                        inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
-                        loss += self.model.optimize_model(input_batch=inputs, label_batch=labels)
-
-                        itered_num += 1
-                        if itered_num >= num_iter:
-                            self.epoch += 1
-                            self.model.exp_lr_sheduler(epoch=self.epoch)
-                            return loss / itered_num  # 返回平均损失
-
+            itered_num += 1
+            if itered_num >= num_iter:
                 self.epoch += 1
                 self.model.exp_lr_sheduler(epoch=self.epoch)
+                return loss / itered_num  # 返回平均损失
+
+            self.epoch += 1
+            self.model.exp_lr_sheduler(epoch=self.epoch)
 
         return loss / itered_num  # 返回平均损失
 
