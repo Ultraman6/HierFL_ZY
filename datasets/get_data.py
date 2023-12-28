@@ -8,9 +8,9 @@ def get_dataloaders(args):
     :return: A list of trainloaders, a list of testloaders, a concatenated trainloader and a concatenated testloader
     """
     if args.dataset in ['mnist', 'cifar10', "femnist"]:
-        train_loaders, test_loaders, v_train_loader, v_test_loader = get_dataset(dataset_root=args.dataset_root,
+        train_loaders, test_loaders, share_data_edge, v_test_loader = get_dataset(dataset_root=args.dataset_root,
                                                                                        dataset=args.dataset,
                                                                                        args = args)
     else:
         raise ValueError("This dataset is not implemented yet")
-    return train_loaders, test_loaders, v_train_loader, v_test_loader
+    return train_loaders, test_loaders, share_data_edge, v_test_loader

@@ -15,7 +15,7 @@ cudnn.banchmark = True
 import torchvision
 import torchvision.transforms as transforms
 from torchvision import datasets
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 from options import args_parser
 
 
@@ -76,19 +76,12 @@ def iid_esize_split(dataset, args, kwargs, is_shuffle=True):
     # if num_samples_per_client == -1, then use all samples
     if args.self_sample == -1:
         num_samples_per_client = int(len(dataset) / args.num_clients)
-        # change from dict to list
-        # print('start')
         for i in range(args.num_clients):
-            # 打印all_idxs, num_samples_per_client的长度
-            # print(len(all_idxs), num_samples_per_client)
             dict_users[i] = np.random.choice(all_idxs, num_samples_per_client, replace=False)
-            # dict_users[i] = dict_users[i].astype(int)
-            # dict_users[i] = set(dict_users[i])
             all_idxs = list(set(all_idxs) - set(dict_users[i]))
             data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
                                          batch_size=args.batch_size,
                                          shuffle=is_shuffle, **kwargs)
-            # print(len(all_idxs), num_samples_per_client)
     else:  # 自定义每客户样本量开启
         # 提取映射关系参数并将其解析为JSON对象
         sample_mapping_json = args.sample_mapping
@@ -102,7 +95,6 @@ def iid_esize_split(dataset, args, kwargs, is_shuffle=True):
             data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
                                          batch_size=args.batch_size,
                                          shuffle=is_shuffle, **kwargs)
-            # print(len(all_idxs), num_samples_per_client)
 
     return data_loaders
 
@@ -356,14 +348,42 @@ def split_data(dataset, args, kwargs, is_shuffle=True):
 def get_dataset(dataset_root, dataset, args):
     # trains, train_loaders, tests, test_loaders = {}, {}, {}, {}
     if dataset == 'mnist':
-        train_loaders, test_loaders, v_train_loader, v_test_loader = get_mnist(dataset_root, args)
+        train_loaders, test_loaders, share_data_edge, v_test_loader = get_mnist(dataset_root, args)
     elif dataset == 'cifar10':
-        train_loaders, test_loaders, v_train_loader, v_test_loader = get_cifar10(dataset_root, args)
+        train_loaders, test_loaders, share_data_edge, v_test_loader = get_cifar10(dataset_root, args)
     elif dataset == 'femnist':
-        train_loaders, test_loaders, v_train_loader, v_test_loader = get_femnist(dataset_root, args)
+        train_loaders, test_loaders, share_data_edge, v_test_loader = get_femnist(dataset_root, args)
     else:
         raise ValueError('Dataset `{}` not found'.format(dataset))
-    return train_loaders, test_loaders, v_train_loader, v_test_loader
+    return train_loaders, test_loaders, share_data_edge, v_test_loader
+
+def create_shared_data_loaders(train, args, **kwargs):
+    """
+    创建每个边缘服务器的共享数据加载器。
+    :param train: 完整的训练数据集。
+    :param args: 包含配置参数，如边缘服务器数量（num_edges）、每个客户的batchsize
+    :return: 每个边缘服务器的共享数据加载器列表。
+    """
+    total_data_size = len(train)
+    data_per_edge = int(0.05 * total_data_size)  # 每个边缘服务器分配 5% 的数据
+    # 创建一个随机索引
+    indices = np.arange(total_data_size)
+    np.random.shuffle(indices)
+    # 分配数据给每个边缘服务器
+    edge_shared_data_loaders = []
+    for eid in range(args.num_edges):
+        # 计算为每个边缘服务器分配的数据的索引
+        start_idx = eid * data_per_edge
+        end_idx = min((eid + 1) * data_per_edge, total_data_size)
+        # 创建数据子集
+        subset_indices = indices[start_idx:end_idx]
+        subset_data = Subset(train, subset_indices)
+        # 创建 DataLoader
+        shared_data_loader = DataLoader(subset_data, batch_size=args.batch_size, shuffle=True, **kwargs)
+        # 添加到列表
+        edge_shared_data_loaders.append(shared_data_loader)
+
+    return edge_shared_data_loaders
 
 
 def get_mnist(dataset_root, args):
@@ -391,14 +411,15 @@ def get_mnist(dataset_root, args):
     else:
         test_loaders = split_data(test, args, kwargs, is_shuffle=False)
 
-    # the actual batch_size may need to change.... Depend on the actual gradient...
-    # originally written to get the gradient of the whole dataset
-    # but now it seems to be able to improve speed of getting accuracy of virtual sequence
-    v_train_loader = DataLoader(train, batch_size=args.batch_size * args.num_clients,
-                                shuffle=True, **kwargs)
+    # 根据 args.share_niid 的值创建共享数据加载器
+    if args.niid_share == 1:
+        share_loaders = create_shared_data_loaders(train, args)
+    else:
+        share_loaders = [None] * args.num_edges
+
     v_test_loader = DataLoader(test, batch_size=args.batch_size * args.num_clients,
                                shuffle=False, **kwargs)
-    return train_loaders, test_loaders, v_train_loader, v_test_loader
+    return train_loaders, test_loaders, share_loaders, v_test_loader
 
 
 def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_complex和resnet18模型
@@ -432,8 +453,13 @@ def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_comple
                              download=True, transform=transform_train)
     test = datasets.CIFAR10(os.path.join(dataset_root, 'cifar10'), train=False,
                             download=True, transform=transform_test)
-    v_train_loader = DataLoader(train, batch_size=args.batch_size,
-                                shuffle=True, **kwargs)
+
+    # 根据 args.share_niid 的值创建共享数据加载器
+    if args.share_niid == 1:
+        share_loaders = create_shared_data_loaders(train, args)
+    else:
+        share_loaders = [None] * args.num_edges
+
     v_test_loader = DataLoader(test, batch_size=args.batch_size,
                                shuffle=False, **kwargs)
     train_loaders = split_data(train, args, kwargs)
@@ -449,7 +475,7 @@ def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_comple
     else:
         test_loaders = split_data(test, args, kwargs)
 
-    return train_loaders, test_loaders, v_train_loader, v_test_loader
+    return train_loaders, test_loaders, share_loaders, v_test_loader
 
 
 def get_femnist(dataset_root, args):

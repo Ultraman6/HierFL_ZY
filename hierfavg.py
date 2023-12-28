@@ -47,7 +47,7 @@ def get_edge_class(args, edges, clients):
     print(f'class distribution among edge {edge_class}')
 
 
-def initialize_edges_iid(num_edges, clients, args, client_class_dis):
+def initialize_edges_iid(num_edges, clients, client_class_dis):
     """
     This function is specially designed for partiion for 10*L users, 1-class per user, but the distribution among edges is iid,
     10 clients per edge, each edge have 10 classes
@@ -99,7 +99,7 @@ def initialize_edges_iid(num_edges, clients, args, client_class_dis):
     return edges, p_clients
 
 
-def initialize_edges_niid(num_edges, clients, args, client_class_dis):
+def initialize_edges_niid(num_edges, clients, client_class_dis):
     """
     This function is specially designed for partiion for 10*L users, 1-class per user, but the distribution among edges is iid,
     10 clients per edge, each edge have 5 classes
@@ -233,42 +233,42 @@ def HierFAVG(args):
         cuda_to_use = torch.device(f'cuda:{args.gpu}')
     device = cuda_to_use if torch.cuda.is_available() else "cpu"
     print(f'Using device {device}')
-    FILEOUT = f"{args.dataset}_clients{args.num_clients}_edges{args.num_edges}_" \
-              f"t1-{args.num_local_update}_t2-{args.num_edge_aggregation}" \
-              f"_model_{args.model}iid{args.iid}edgeiid{args.edgeiid}epoch{args.num_communication}" \
-              f"bs{args.batch_size}lr{args.lr}lr_decay_rate{args.lr_decay}" \
-              f"lr_decay_epoch{args.lr_decay_epoch}momentum{args.momentum}"
-    writer = SummaryWriter(comment=FILEOUT)
     # Build dataloaders
-    train_loaders, test_loaders, v_train_loader, v_test_loader = get_dataloaders(args)
+    train_loaders, test_loaders, share_loaders, v_test_loader = get_dataloaders(args)
     if args.show_dis:
-        # 训练集加载器划分
+        # 显示客户端的训练集和测试集分布
         for i in range(args.num_clients):
+            # 显示训练集分布
             train_loader = train_loaders[i]
-            print(len(train_loader.dataset))
-            distribution = show_distribution(train_loader, args)
-            print("train dataloader {} distribution".format(i))
-            print(distribution)
-        # 测试集加载器划分
-        for i in range(args.num_clients):
+            print("Train dataloader {} size: {}".format(i, len(train_loader.dataset)))
+            train_distribution = show_distribution(train_loader, args)
+            print("Train dataloader {} distribution:".format(i))
+            print(train_distribution)
+            # 显示测试集分布
             test_loader = test_loaders[i]
-            test_size = len(test_loaders[i].dataset)
-            print(len(test_loader.dataset))
+            test_size = len(test_loader.dataset)
+            print("Test dataloader {} size: {}".format(i, test_size))
             if args.test_on_all_samples != 1:
-                distribution = show_distribution(test_loader, args)
-                print(distribution)
-            print("test dataloader {} distribution".format(i))
-            print(f"test dataloader size {test_size}")
+                test_distribution = show_distribution(test_loader, args)
+                print("Test dataloader {} distribution:".format(i))
+                print(test_distribution)
+        # 显示边缘服务器的共享数据分布
+        if args.niid_share:
+            for eid in range(args.num_edges):
+                print("Edge {} shared data size: {}".format(eid, len(share_loaders[eid].dataset)))
+                shared_data_distribution = show_distribution(share_loaders[eid], args)
+                print("Edge {} shared data distribution:".format(eid))
+                print(shared_data_distribution)
+        else:
+            print("Edges  has no shared data")
 
     # 读取mapping配置信息
     mapping = None
     if args.active_mapping == 1:
         # 提取映射关系参数并将其解析为JSON对象
         mapping = json.loads(args.mapping)
-    com_client_mapping = json.loads(args.com_client_mapping)
-    com_edge_mapping = json.loads(args.com_edge_mapping)
 
-    # initialize clients and server
+    # 初始化 客户集 和 边缘服务器集
     clients = []
     for i in range(args.num_clients):
         # 初始化客户端
@@ -276,7 +276,7 @@ def HierFAVG(args):
                               train_loader=train_loaders[i],
                               test_loader=test_loaders[i],
                               args=args,
-                              device=device,com_params=com_client_mapping[str(i)]) )
+                              device=device))
 
     initilize_parameters = list(clients[0].model.shared_layers.parameters())
     nc = len(initilize_parameters)
@@ -321,7 +321,7 @@ def HierFAVG(args):
             cids = list(set(cids) - set(selected_cids))
             edges.append(Edge(id=i,
                               cids=selected_cids,
-                              shared_layers=copy.deepcopy(clients[0].model.shared_layers),com_params=com_edge_mapping[str(i)]))
+                              shared_layers=copy.deepcopy(clients[0].model.shared_layers), share_dataloader=share_loaders[i]))
             [edges[i].client_register(clients[cid]) for cid in selected_cids]
             edges[i].all_trainsample_num = sum(edges[i].sample_registration.values())
             p_clients[i] = [sample / float(edges[i].all_trainsample_num) for sample in
@@ -369,7 +369,6 @@ def HierFAVG(args):
                     client_loss += clients[selected_cid].local_update(num_iter=args.num_local_update,
                                                                       device=device)
                     clients[selected_cid].send_to_edgeserver(edge) # 上传梯度和速率
-                print(edge.client_rates) # 检查速率是否正确计算与保存
                 edge_loss[i] = client_loss
                 edge_sample[i] = sum(edge.sample_registration.values())
 
@@ -384,12 +383,6 @@ def HierFAVG(args):
 
             print(f"correct_all: {correct_all}, total_all: {total_all}, avg_acc: {avg_acc}")
             all_acc_sum += avg_acc
-            # writer.add_scalar(f'Partial_Avg_Train_loss',
-            #                   all_loss,
-            #                   num_comm * args.num_edge_aggregation + num_edgeagg + 1)
-            # writer.add_scalar(f'All_Avg_Test_Acc_edgeagg',
-            #                   avg_acc,
-            #                   num_comm * args.num_edge_aggregation + num_edgeagg + 1)
 
         # 开始云端聚合
         for edge in edges:
@@ -397,8 +390,6 @@ def HierFAVG(args):
         cloud.aggregate(args)
         for edge in edges:
             cloud.send_to_edge(edge)
-        # accs[num_comm] = all_acc_sum / args.num_edge_aggregation
-        # losses[num_comm] = all_loss_sum / args.num_edge_aggregation
         accs_edge_avg.append(all_acc_sum / args.num_edge_aggregation)
         losses_edge_avg.append(all_loss_sum / args.num_edge_aggregation)
         global_nn.load_state_dict(state_dict=copy.deepcopy(cloud.shared_state_dict))
@@ -409,11 +400,7 @@ def HierFAVG(args):
         # 在轮次结束时记录相对于开始时间的时间差, 记录云端轮的测试精度
         times.append(time.time() - start_time)
         accs_cloud.append(avg_acc_v)
-        # writer.add_scalar(f'All_Avg_Test_Acc_cloudagg_Vtest',
-        #                   avg_acc_v,
-        #                   num_comm + 1)
 
-    writer.close()
     # 画出云端的精度-时间曲线图
     plt.plot(times, accs_cloud, marker='v', color='r', label="HierFL")
     plt.legend()
@@ -421,14 +408,6 @@ def HierFAVG(args):
     plt.ylabel('Test Model Accuracy')
     plt.title('Test Accuracy over Time')
     plt.show()
-    # 最终测试精度
-    # print(f"The final virtual acc is {avg_acc_v}")
-    # 云聚合轮次数，全局精度，平均损失
-    # print(f"云聚合轮次数：{args.num_communication}")
-    # print(f"每轮云端聚合的全局精度：{accs_edge_avg}")
-    # print(f"每轮云端聚合的平均损失：{losses_edge_avg}")
-    # print(accs_edge_avg)
-    # print(losses_edge_avg)
 
 
 def main():

@@ -11,7 +11,7 @@ from average import average_weights
 
 class Edge():
 
-    def __init__(self, id, cids, shared_layers, com_params):
+    def __init__(self, id, cids, shared_layers, share_dataloader=None):
         """
         id: edge id
         cids: ids of the clients under this edge
@@ -35,13 +35,7 @@ class Edge():
         self.sample_registration = {}
         self.all_trainsample_num = 0
         self.shared_state_dict = shared_layers.state_dict()
-        self.clock = []
-        # 边缘服务器上行链路用参数
-        self.X=com_params[0]
-        self.Q=com_params[1]
-        self.W=com_params[2]
-        # 存放每边缘轮客户上传的速率, 键值对存放
-        self.client_rates={id:0 for id in cids}
+        self.share_dataloader = share_dataloader
 
     def refresh_edgeserver(self):
         self.receiver_buffer.clear()
@@ -49,14 +43,18 @@ class Edge():
         self.sample_registration.clear()
         return None
 
-    def client_register(self, client):
+    def client_register(self, client): # 注册用户信息同时决定是否把共享数据集传入
         self.id_registration.append(client.id)
         self.sample_registration[client.id] = len(client.train_loader.dataset)
+        # 数据量还要加上共享数据集的
+        if self.share_dataloader != None:
+            client.train_loader.share_dataloader = self.share_dataloader
+            self.sample_registration[client.id] += len(self.share_dataloader.dataset)
+
         return None
 
-    def receive_from_client(self, client_id, cshared_state_dict, rate):
+    def receive_from_client(self, client_id, cshared_state_dict):
         self.receiver_buffer[client_id] = cshared_state_dict
-        self.client_rates[client_id] = rate
         return None
 
     def aggregate(self, args):

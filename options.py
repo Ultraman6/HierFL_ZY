@@ -97,11 +97,18 @@ def args_parser():
     parser.add_argument(
         '--iid',
         type = int,
+        default = 0,
+        help = 'distribution of the data, 1,0,-1,-2 分别表示iid同大小、niid同大小、iid不同大小、niid同大小且仅一类(one-class)'
+    )
+    # 缓解niid策略——每个edge共享数据给足下客户
+    parser.add_argument(
+        '--niid_share',
+        type = int,
         default = 1,
-        help = 'distribution of the data, 1,0,-1,-2(one-class)'
+        help = '1 表示开启共享niid缓解， 0表示关闭. 该参数将直接影响初始数据划分和训练前给客户并入数据'
     )
     parser.add_argument(
-        '--edgeiid',
+        '--edgeiid',   # 只有在客户数 = 10倍的边缘数才生效
         type=int,
         default = 1,
         help='distribution of the data under edges, 1 (edgeiid),0 (edgeniid) (used only when iid = -2)'
@@ -130,10 +137,11 @@ def args_parser():
     # 定义clients及其分配样本量的关系
     parser.add_argument(
         '--self_sample',
-        default= 0,
+        default= -1,
         type=int,
-        help='>=0: set sample of each client， -1: all samples'
+        help='>=0: set sample of each client， -1: auto samples'
     )
+
     # 将映射关系转换为JSON格式，主键个数必须等于num_edges，value为-1表示all samples
     sample_mapping_json = json.dumps({
         "0": 3000,
@@ -147,33 +155,6 @@ def args_parser():
         type = str,
         default = sample_mapping_json,
         help = 'mapping of clients and their samples'
-    )
-    # 定义client的通信参数
-    # 将映射关系转换为JSON格式，主键个数必须等于num_clients，value表示三个参数
-    com_client_mapping_json = json.dumps({
-        "0": [1,1,1],
-        "1": [1,1,1],
-        "2": [1,1,1],
-        "3": [1,1,1],
-        "4": [1,1,1],
-    })
-    parser.add_argument(
-        '--com_client_mapping',
-        type = str,
-        default = com_client_mapping_json,
-        help = 'mapping of clients and their params in communication'
-    )
-    # 定义edge的通信参数
-    # 将映射关系转换为JSON格式，主键个数必须等于num_edges，value表示三个参数
-    com_edge_mapping_json = json.dumps({
-        "0": [1,1,1],
-        "1": [1,1,1],
-    })
-    parser.add_argument(
-        '--com_edge_mapping',
-        type = str,
-        default = com_edge_mapping_json,
-        help = 'mapping of edges and their params in communication'
     )
 
     parser.add_argument(
@@ -229,25 +210,22 @@ def args_parser():
         type=int
     )
 
-    # editer: Sensorjang 20230925
     parser.add_argument(
         '--test_on_all_samples',
         type = int,
-        default = 1,
+        default = 0,
         help = '1 means test on all samples, 0 means test samples will be split averagely to each client'
     )
-
-    # editer: Sensorjang 20230925
     # 定义edges及其下属clients的映射关系
     parser.add_argument(
         '--active_mapping',
         type = int,
-        default = 0,
+        default = 1,
         help = '1 means mapping is active, 0 means mapping is inactive'
     )
     mapping = {
-        "0": [0, 1, 2, 3],
-        "1": [4]
+        "0": [0, 1, 2],
+        "1": [3, 4]
     }
     # 将映射关系转换为JSON格式
     mapping_json = json.dumps(mapping)
