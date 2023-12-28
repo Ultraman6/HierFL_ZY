@@ -48,8 +48,8 @@ class Edge():
         self.sample_registration[client.id] = len(client.train_loader.dataset)
         # 数据量还要加上共享数据集的
         if self.share_dataloader != None:
-            client.train_loader.share_dataloader = self.share_dataloader
             self.sample_registration[client.id] += len(self.share_dataloader.dataset)
+            return self.share_dataloader
 
         return None
 

@@ -213,7 +213,7 @@ def args_parser():
     parser.add_argument(
         '--test_on_all_samples',
         type = int,
-        default = 0,
+        default = 1,
         help = '1 means test on all samples, 0 means test samples will be split averagely to each client'
     )
     # 定义edges及其下属clients的映射关系

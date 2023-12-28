@@ -322,7 +322,11 @@ def HierFAVG(args):
             edges.append(Edge(id=i,
                               cids=selected_cids,
                               shared_layers=copy.deepcopy(clients[0].model.shared_layers), share_dataloader=share_loaders[i]))
-            [edges[i].client_register(clients[cid]) for cid in selected_cids]
+
+            # 注册客户信息并把共享数据集给到客户端
+            for cid in selected_cids:
+                clients[cid].share_dataloader = edges[i].client_register(clients[cid])
+
             edges[i].all_trainsample_num = sum(edges[i].sample_registration.values())
             p_clients[i] = [sample / float(edges[i].all_trainsample_num) for sample in
                             list(edges[i].sample_registration.values())]
@@ -376,6 +380,7 @@ def HierFAVG(args):
                 correct, total = all_clients_test(edge, clients, edge.cids, device)
                 correct_all += correct
                 total_all += total
+
             # 结束边缘迭代
             all_loss = sum([e_loss * e_sample for e_loss, e_sample in zip(edge_loss, edge_sample)]) / sum(edge_sample)
             all_loss_sum += all_loss
