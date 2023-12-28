@@ -325,7 +325,7 @@ def HierFAVG(args):
 
             # 注册客户信息并把共享数据集给到客户端
             for cid in selected_cids:
-                clients[cid].share_dataloader = edges[i].client_register(clients[cid])
+                clients[cid].combine_share_data(edges[i].client_register(clients[cid]))
 
             edges[i].all_trainsample_num = sum(edges[i].sample_registration.values())
             p_clients[i] = [sample / float(edges[i].all_trainsample_num) for sample in

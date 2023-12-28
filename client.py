@@ -9,6 +9,8 @@ from math import log
 
 from torch.autograd import Variable
 import torch
+from torch.utils.data import ConcatDataset, DataLoader
+
 from models.initialize_model import initialize_model
 import copy
 
@@ -24,7 +26,14 @@ class Client():
         self.receiver_buffer = {}
         self.batch_size = args.batch_size
         self.epoch = 0
-        self.share_dataloader = None  # 添加共享数据加载器属性
+        # self.share_dataloader = None  # 添加共享数据加载器属性
+
+    def combine_share_data(self, share_dataloader):
+            # 合并数据集
+            combined_dataset = ConcatDataset([self.train_loader.dataset, share_dataloader.dataset])
+            # 创建新的数据加载器
+            self.train_loader = DataLoader(combined_dataset, batch_size=self.train_loader.batch_size, shuffle=True)
+            # print(len(self.train_loader.dataset))
 
     def local_update(self, num_iter, device):
         itered_num = 0
@@ -37,14 +46,6 @@ class Client():
                 inputs, labels = data
                 inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
                 loss += self.model.optimize_model(input_batch=inputs, label_batch=labels)
-
-            # 继续使用共享数据进行训练
-            if self.share_dataloader != None:
-                # print("使用共享数据进行训练")
-                for data in self.share_dataloader:
-                    inputs, labels = data
-                    inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
-                    loss += self.model.optimize_model(input_batch=inputs, label_batch=labels)
 
             itered_num += 1
             if itered_num >= num_iter:
