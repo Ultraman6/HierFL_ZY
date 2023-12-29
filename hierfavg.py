@@ -415,8 +415,8 @@ def HierFAVG(args):
 def train_client(client, edge, num_iter, device, return_dict, client_id):
     print(f"Client {client.id} 本地迭代开始")
     # 如果设备是GPU，则设置相应的CUDA设备
-    if device.type == 'cuda':
-        torch.cuda.set_device(device)
+    if torch.cuda.is_available():
+        torch.cuda.set_device("cuda:0")  # 确保在每个线程中设置GPU
     # 客户端与边缘服务器同步
     edge.send_to_client(client)
     client.sync_with_edgeserver()

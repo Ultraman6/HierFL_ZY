@@ -35,7 +35,7 @@ def args_parser():
     parser.add_argument(
         '--train_batch_size',
         type = int,
-        default = 32,
+        default = 8,
         help = 'batch size when trained on client'
     )
     parser.add_argument(
