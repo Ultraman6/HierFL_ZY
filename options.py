@@ -104,7 +104,7 @@ def args_parser():
     parser.add_argument(
         '--niid_share',
         type = int,
-        default = 1,
+        default = 0,
         help = '1 表示开启共享niid缓解， 0表示关闭. 该参数将直接影响初始数据划分和训练前给客户并入数据'
     )
     parser.add_argument(

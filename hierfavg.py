@@ -323,9 +323,9 @@ def HierFAVG(args):
                               cids=selected_cids,
                               shared_layers=copy.deepcopy(clients[0].model.shared_layers), share_dataloader=share_loaders[i]))
 
-            # 注册客户信息并把共享数据集给到客户端
+            # 注册客户信息并按需把共享数据集给到客户端
             for cid in selected_cids:
-                clients[cid].combine_share_data(edges[i].client_register(clients[cid]))
+                edges[i].client_register(clients[cid])
 
             edges[i].all_trainsample_num = sum(edges[i].sample_registration.values())
             p_clients[i] = [sample / float(edges[i].all_trainsample_num) for sample in
@@ -345,8 +345,8 @@ def HierFAVG(args):
         global_nn = global_nn.cuda(device)
 
     # 开始训练
-    accs_edge_avg = []  # 记录云端的平均边缘测试精度
-    losses_edge_avg = []  # 记录云端的平均边缘损失
+    # accs_edge_avg = []  # 记录云端的平均边缘测试精度
+    # losses_edge_avg = []  # 记录云端的平均边缘损失
     accs_cloud=[0.0] # 记录每轮云端聚合的精度
     times = [0] # 记录每个云端轮结束的时间戳
     # 获取初始时间戳（训练开始时）
@@ -366,28 +366,32 @@ def HierFAVG(args):
             # print(edges)
             for i, edge in enumerate(edges):  # 边缘迭代
                 # edge.refresh_edgeserver()
-                client_loss = 0.0  # 本地loss累计
+                client_loss = 0.0  # 边缘下client的总loss
                 for selected_cid in edge.cids:
                     edge.send_to_client(clients[selected_cid])
                     clients[selected_cid].sync_with_edgeserver()
+                    # print(len(clients[selected_cid].train_loader.dataset))
                     client_loss += clients[selected_cid].local_update(num_iter=args.num_local_update,
                                                                       device=device)
-                    clients[selected_cid].send_to_edgeserver(edge) # 上传梯度和速率
+                    clients[selected_cid].send_to_edgeserver(edge)  # 上传梯度和速率
+
+                # 边缘训练损失
                 edge_loss[i] = client_loss
                 edge_sample[i] = sum(edge.sample_registration.values())
-
                 edge.aggregate(args)
-                correct, total = all_clients_test(edge, clients, edge.cids, device)
-                correct_all += correct
-                total_all += total
+
+                # 边缘测试精度
+                # correct, total = all_clients_test(edge, clients, edge.cids, device)
+                # correct_all += correct
+                # total_all += total
 
             # 结束边缘迭代
             all_loss = sum([e_loss * e_sample for e_loss, e_sample in zip(edge_loss, edge_sample)]) / sum(edge_sample)
             all_loss_sum += all_loss
-            avg_acc = correct_all / total_all
+            # avg_acc = correct_all / total_all
 
-            print(f"correct_all: {correct_all}, total_all: {total_all}, avg_acc: {avg_acc}")
-            all_acc_sum += avg_acc
+            # print(f"correct_all: {correct_all}, total_all: {total_all}, avg_acc: {avg_acc}")
+            # all_acc_sum += avg_acc
 
         # 开始云端聚合
         for edge in edges:
@@ -395,10 +399,12 @@ def HierFAVG(args):
         cloud.aggregate(args)
         for edge in edges:
             cloud.send_to_edge(edge)
-        accs_edge_avg.append(all_acc_sum / args.num_edge_aggregation)
-        losses_edge_avg.append(all_loss_sum / args.num_edge_aggregation)
+        # accs_edge_avg.append(all_acc_sum / args.num_edge_aggregation)
+        # losses_edge_avg.append(all_loss_sum / args.num_edge_aggregation)
         global_nn.load_state_dict(state_dict=copy.deepcopy(cloud.shared_state_dict))
         global_nn.train(False)
+
+        # 云端测试
         correct_all_v, total_all_v = fast_all_clients_test(v_test_loader, global_nn, device)
         avg_acc_v = correct_all_v / total_all_v  # 测试精度
 

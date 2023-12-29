@@ -46,12 +46,10 @@ class Edge():
     def client_register(self, client): # 注册用户信息同时决定是否把共享数据集传入
         self.id_registration.append(client.id)
         self.sample_registration[client.id] = len(client.train_loader.dataset)
-        # 数据量还要加上共享数据集的
+        # 数据量还要加上共享数据集
         if self.share_dataloader != None:
             self.sample_registration[client.id] += len(self.share_dataloader.dataset)
-            return self.share_dataloader
-
-        return None
+            client.combine_share_data(self.share_dataloader)
 
     def receive_from_client(self, client_id, cshared_state_dict):
         self.receiver_buffer[client_id] = cshared_state_dict
