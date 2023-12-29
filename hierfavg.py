@@ -4,6 +4,7 @@ import json
 import time
 
 from matplotlib import pyplot as plt
+from torch import multiprocessing
 
 from options import args_parser
 from tensorboardX import SummaryWriter
@@ -20,6 +21,7 @@ from models.cifar_cnn_3conv_layer import cifar_cnn_3conv
 from models.cifar_resnet import ResNet18
 from models.mnist_logistic import LogisticRegression
 import os
+import torch.multiprocessing as mp
 
 
 def get_client_class(args, clients):
@@ -138,8 +140,7 @@ def initialize_edges_niid(num_edges, clients, client_class_dis):
         p_clients[eid] = [sample / float(edges[eid].all_trainsample_num)
                           for sample in list(edges[eid].sample_registration.values())]
         edges[eid].refresh_edgeserver()
-    # And the last one, eid == num_edges -1
-    # Find the last available labels
+
     eid = num_edges - 1
     assigned_clients_idxes = []
     for label in range(10):
@@ -291,7 +292,6 @@ def HierFAVG(args):
     clients_per_edge = int(args.num_clients / args.num_edges)
     p_clients = [0.0] * args.num_edges
 
-
     if args.iid == -2:
         if args.edgeiid == 1:
             client_class_dis = get_client_class(args, clients)
@@ -319,9 +319,9 @@ def HierFAVG(args):
                     selected_cids = np.random.choice(cids, clients_per_edge, replace=False)
             print(f"Edge {i} has clients {selected_cids}")
             cids = list(set(cids) - set(selected_cids))
-            edges.append(Edge(id=i,
-                              cids=selected_cids,
-                              shared_layers=copy.deepcopy(clients[0].model.shared_layers), share_dataloader=share_loaders[i]))
+            edges.append(Edge(id=i, cids=selected_cids,
+                              shared_layers=copy.deepcopy(clients[0].model.shared_layers),
+                              share_dataloader=share_loaders[i]))
 
             # 注册客户信息并按需把共享数据集给到客户端
             for cid in selected_cids:
@@ -347,8 +347,8 @@ def HierFAVG(args):
     # 开始训练
     # accs_edge_avg = []  # 记录云端的平均边缘测试精度
     # losses_edge_avg = []  # 记录云端的平均边缘损失
-    accs_cloud=[0.0] # 记录每轮云端聚合的精度
-    times = [0] # 记录每个云端轮结束的时间戳
+    accs_cloud = [0.0]  # 记录每轮云端聚合的精度
+    times = [0]  # 记录每个云端轮结束的时间戳
     # 获取初始时间戳（训练开始时）
     start_time = time.time()
     for num_comm in tqdm(range(args.num_communication)):  # 云聚合
@@ -356,7 +356,9 @@ def HierFAVG(args):
         [cloud.edge_register(edge=edge) for edge in edges]
         all_loss_sum = 0.0
         all_acc_sum = 0.0
+        print(f"Communication round {num_comm}")
         for num_edgeagg in range(args.num_edge_aggregation):  # 边缘聚合
+            print(f"Edge aggregation round {num_edgeagg}")
             edge_loss = [0.0] * args.num_edges
             edge_sample = [0] * args.num_edges
             correct_all = 0.0
@@ -365,19 +367,34 @@ def HierFAVG(args):
             # for each edge, iterate
             # print(edges)
             for i, edge in enumerate(edges):  # 边缘迭代
+                print(f"Edge {i} 开始迭代")
                 # edge.refresh_edgeserver()
-                client_loss = 0.0  # 边缘下client的总loss
-                for selected_cid in edge.cids:
-                    edge.send_to_client(clients[selected_cid])
-                    clients[selected_cid].sync_with_edgeserver()
-                    # print(len(clients[selected_cid].train_loader.dataset))
-                    client_loss += clients[selected_cid].local_update(num_iter=args.num_local_update,
-                                                                      device=device)
-                    clients[selected_cid].send_to_edgeserver(edge)  # 上传梯度和速率
+                # client_loss = 0.0  # 边缘下client的总loss
 
+                # 创建一个进程列表
+                processes = []
+                # 准备用于存储结果的管理器字典
+                manager = mp.Manager()
+                return_dict = manager.dict()
+                for selected_cid in edge.cids:
+                    # 下行链路
+                    client = clients[selected_cid]
+                    proc = mp.Process(target=train_client,
+                                      args=(client, edge, args.num_local_update, device, return_dict, selected_cid))
+                    processes.append(proc)
+                    proc.start()
+                    # edge.send_to_client(clients[selected_cid])
+                    # clients[selected_cid].sync_with_edgeserver()
+                    # client_loss += clients[selected_cid].local_update(num_iter=args.num_local_update,
+                    #                                                   device=device)
+                    clients[selected_cid].send_to_edgeserver(edge)  # 上传梯度
+                # 等待所有进程完成
+                for proc in processes:
+                    proc.join()
                 # 边缘训练损失
-                edge_loss[i] = client_loss
+                edge_loss[i] = sum(return_dict.values())
                 edge_sample[i] = sum(edge.sample_registration.values())
+                print(f"Edge {i} 聚合")
                 edge.aggregate(args)
 
                 # 边缘测试精度
@@ -389,13 +406,13 @@ def HierFAVG(args):
             all_loss = sum([e_loss * e_sample for e_loss, e_sample in zip(edge_loss, edge_sample)]) / sum(edge_sample)
             all_loss_sum += all_loss
             # avg_acc = correct_all / total_all
-
             # print(f"correct_all: {correct_all}, total_all: {total_all}, avg_acc: {avg_acc}")
             # all_acc_sum += avg_acc
 
         # 开始云端聚合
         for edge in edges:
             edge.send_to_cloudserver(cloud)
+        print(f"Cloud 聚合")
         cloud.aggregate(args)
         for edge in edges:
             cloud.send_to_edge(edge)
@@ -405,6 +422,7 @@ def HierFAVG(args):
         global_nn.train(False)
 
         # 云端测试
+        print(f"Cloud 测试")
         correct_all_v, total_all_v = fast_all_clients_test(v_test_loader, global_nn, device)
         avg_acc_v = correct_all_v / total_all_v  # 测试精度
 
@@ -419,6 +437,21 @@ def HierFAVG(args):
     plt.ylabel('Test Model Accuracy')
     plt.title('Test Accuracy over Time')
     plt.show()
+
+
+def train_client(client, edge, num_iter, device, return_dict, client_id):
+    # 如果设备是GPU，则设置相应的CUDA设备
+    if device.type == 'cuda':
+        torch.cuda.set_device(device)
+    # 客户端与边缘服务器同步
+    edge.send_to_client(client)
+    client.sync_with_edgeserver()
+    # 执行本地更新
+    client_loss = client.local_update(num_iter=num_iter, device=device)
+    # 将更新后的模型发送回边缘服务器
+    client.send_to_edgeserver(edge)
+    # 存储结果
+    return_dict[client_id] = client_loss
 
 
 def main():

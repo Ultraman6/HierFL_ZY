@@ -3,6 +3,8 @@ download the required dataset, split the data among the clients, and generate Da
 """
 import json
 import os
+import random
+
 from tqdm import tqdm
 from sklearn import metrics
 import numpy as np
@@ -80,7 +82,7 @@ def iid_esize_split(dataset, args, kwargs, is_shuffle=True):
             dict_users[i] = np.random.choice(all_idxs, num_samples_per_client, replace=False)
             all_idxs = list(set(all_idxs) - set(dict_users[i]))
             data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                         batch_size=args.batch_size,
+                                         batch_size=args.train_batch_size,
                                          shuffle=is_shuffle, **kwargs)
     else:  # 自定义每客户样本量开启
         # 提取映射关系参数并将其解析为JSON对象
@@ -93,7 +95,7 @@ def iid_esize_split(dataset, args, kwargs, is_shuffle=True):
             dict_users[i] = np.random.choice(all_idxs, sample, replace=False)
             all_idxs = list(set(all_idxs) - set(dict_users[i]))
             data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                         batch_size=args.batch_size,
+                                         batch_size=args.train_batch_size,
                                          shuffle=is_shuffle, **kwargs)
 
     return data_loaders
@@ -111,7 +113,7 @@ def iid_nesize_split(dataset, args, kwargs, is_shuffle=True):
         # dict_users[i] = set(dict_users[i])
         all_idxs = list(set(all_idxs) - set(dict_users[i]))
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                     batch_size=args.batch_size,
+                                     batch_size=args.train_batch_size,
                                      shuffle=is_shuffle, **kwargs)
 
     return data_loaders
@@ -154,7 +156,7 @@ def niid_esize_split(dataset, args, kwargs, is_shuffle=True):
             dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs: (rand + 1) * num_imgs]), axis=0)
             dict_users[i] = dict_users[i].astype(int)
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                     batch_size=args.batch_size,
+                                     batch_size=args.train_batch_size,
                                      shuffle=is_shuffle, **kwargs)
     return data_loaders
 
@@ -183,10 +185,9 @@ def niid_esize_split_train(dataset, args, kwargs, is_shuffle=True):
             dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs: (rand + 1) * num_imgs]), axis=0)
             dict_users[i] = dict_users[i].astype(int)
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                     batch_size=args.batch_size,
+                                     batch_size=args.train_batch_size,
                                      shuffle=is_shuffle,
-                                     **kwargs
-                                     )
+                                     **kwargs)
     return data_loaders, split_pattern
 
 
@@ -211,10 +212,9 @@ def niid_esize_split_test(dataset, args, kwargs, split_pattern, is_shuffle=False
             dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs: (rand + 1) * num_imgs]), axis=0)
             dict_users[i] = dict_users[i].astype(int)
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                     batch_size=args.batch_size,
+                                     batch_size=args.train_batch_size,
                                      shuffle=is_shuffle,
-                                     **kwargs
-                                     )
+                                     **kwargs)
     return data_loaders, None
 
 
@@ -242,10 +242,9 @@ def niid_esize_split_train_large(dataset, args, kwargs, is_shuffle=True):
             # store the label
             split_pattern[i].append(dataset.__getitem__(idxs[rand * num_imgs])[1])
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                     batch_size=args.batch_size,
+                                     batch_size=args.train_batch_size,
                                      shuffle=is_shuffle,
-                                     **kwargs
-                                     )
+                                     **kwargs)
     return data_loaders, split_pattern
 
 
@@ -280,10 +279,9 @@ def niid_esize_split_test_large(dataset, args, kwargs, split_pattern, is_shuffle
             dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs: (rand + 1) * num_imgs]), axis=0)
             dict_users[i] = dict_users[i].astype(int)
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                     batch_size=args.batch_size,
+                                     batch_size=args.train_batch_size,
                                      shuffle=is_shuffle,
-                                     **kwargs
-                                     )
+                                     **kwargs)
     return data_loaders, None
 
 
@@ -322,7 +320,7 @@ def niid_esize_split_oneclass(dataset, args, kwargs, is_shuffle=True):
             dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs: (rand + 1) * num_imgs]), axis=0)
             dict_users[i] = dict_users[i].astype(int)
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                     batch_size=args.batch_size,
+                                     batch_size=args.train_batch_size,
                                      shuffle=is_shuffle, **kwargs)
     return data_loaders
 
@@ -379,7 +377,7 @@ def create_shared_data_loaders(train, args, **kwargs):
         subset_indices = indices[start_idx:end_idx]
         subset_data = Subset(train, subset_indices)
         # 创建 DataLoader
-        shared_data_loader = DataLoader(subset_data, batch_size=args.batch_size, shuffle=True, **kwargs)
+        shared_data_loader = DataLoader(subset_data, batch_size=args.train_batch_size, shuffle=True, **kwargs)
         # 添加到列表
         edge_shared_data_loaders.append(shared_data_loader)
 
@@ -388,7 +386,7 @@ def create_shared_data_loaders(train, args, **kwargs):
 
 def get_mnist(dataset_root, args):
     is_cuda = args.cuda
-    kwargs = {'num_workers': 1, 'pin_memory': True} if is_cuda else {}
+    kwargs = {'num_workers': args.num_workers, 'pin_memory': True} if is_cuda else {}
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,)),
@@ -405,7 +403,7 @@ def get_mnist(dataset_root, args):
         # 将整个测试集分配给每个客户端
         for i in range(args.num_clients):
             test_loader = torch.utils.data.DataLoader(
-                test, batch_size=args.batch_size, shuffle=False, **kwargs
+                test, batch_size=args.test_batch_size, shuffle=False, **kwargs
             )
             test_loaders.append(test_loader)
     else:
@@ -417,14 +415,25 @@ def get_mnist(dataset_root, args):
     else:
         share_loaders = [None] * args.num_edges
 
-    v_test_loader = DataLoader(test, batch_size=args.batch_size * args.num_clients,
-                               shuffle=False, **kwargs)
+    # v_test_loader = DataLoader(test, batch_size=args.test_batch_size * args.num_clients,
+    #                            shuffle=False, **kwargs)
+
+    test_set_size = len(test)
+    subset_size = int(test_set_size * args.test_ratio)  # 例如，保留20%的数据
+    # 生成随机索引来创建子集
+    indices = list(range(test_set_size))
+    subset_indices = random.sample(indices, subset_size)
+    # 创建子集
+    subset = Subset(test, subset_indices)
+    # 使用子集创建 DataLoader
+    v_test_loader = DataLoader(subset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
+
     return train_loaders, test_loaders, share_loaders, v_test_loader
 
 
 def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_complex和resnet18模型
     is_cuda = args.cuda
-    kwargs = {'num_workers': 1, 'pin_memory': True} if is_cuda else {}
+    kwargs = {'num_workers': args.num_workers, 'pin_memory': True} if is_cuda else {}
     if args.model == 'cnn_complex':
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
@@ -460,8 +469,16 @@ def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_comple
     else:
         share_loaders = [None] * args.num_edges
 
-    v_test_loader = DataLoader(test, batch_size=args.batch_size,
-                               shuffle=False, **kwargs)
+    test_set_size = len(test)
+    subset_size = int(test_set_size * args.test_ratio)  # 例如，保留20%的数据
+    # 生成随机索引来创建子集
+    indices = list(range(test_set_size))
+    subset_indices = random.sample(indices, subset_size)
+    # 创建子集
+    subset = Subset(test, subset_indices)
+    # 使用子集创建 DataLoader
+    v_test_loader = DataLoader(subset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
+
     train_loaders = split_data(train, args, kwargs)
 
     test_loaders = []
@@ -469,7 +486,7 @@ def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_comple
         # 将整个测试集分配给每个客户端
         for i in range(args.num_clients):
             test_loader = torch.utils.data.DataLoader(
-                test, batch_size=args.batch_size, shuffle=False, **kwargs
+                test, batch_size=args.test_batch_size, shuffle=False, **kwargs
             )
             test_loaders.append(test_loader)
     else:

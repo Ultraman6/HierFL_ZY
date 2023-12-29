@@ -33,10 +33,28 @@ def args_parser():
     )
     #nn training hyper parameter
     parser.add_argument(
-        '--batch_size',
+        '--train_batch_size',
         type = int,
-        default = 10,
+        default = 32,
         help = 'batch size when trained on client'
+    )
+    parser.add_argument(
+        '--test_batch_size',
+        type = int,
+        default = 16,
+        help = 'batch size when tested on client'
+    )
+    parser.add_argument(
+        '--num_workers',
+        type = int,
+        default = 8,
+        help = 'numworks for dataloader'
+    )
+    parser.add_argument(
+        '--test_ratio',
+        type = int,
+        default = 0.2,
+        help = 'ratio of test dataset'
     )
     # -------------云聚合轮次、边缘聚合轮次、本地更新轮次
     parser.add_argument(

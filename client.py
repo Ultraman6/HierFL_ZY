@@ -24,7 +24,7 @@ class Client():
         self.model = initialize_model(args, device)
         # copy.deepcopy(self.model.shared_layers.state_dict())
         self.receiver_buffer = {}
-        self.batch_size = args.batch_size
+        # self.batch_size = args.batch_size
         self.epoch = 0
         # self.share_dataloader = None  # 添加共享数据加载器属性
 
@@ -32,7 +32,8 @@ class Client():
             # 合并数据集
             combined_dataset = ConcatDataset([self.train_loader.dataset, share_dataloader.dataset])
             # 创建新的数据加载器
-            self.train_loader = DataLoader(combined_dataset, batch_size=self.train_loader.batch_size, shuffle=True)
+            self.train_loader = DataLoader(combined_dataset, batch_size=self.train_loader.batch_size,
+                                           shuffle=True, num_workers=self.train_loader.num_workers, pin_memory=True)
             # print(len(self.train_loader.dataset))
 
     def local_update(self, num_iter, device):
@@ -44,7 +45,7 @@ class Client():
             # print("使用私有数据进行训练")
             for data in self.train_loader:
                 inputs, labels = data
-                inputs, labels = Variable(inputs).to(device), Variable(labels).to(device)
+                inputs, labels = inputs.to(device), labels.to(device)
                 loss += self.model.optimize_model(input_batch=inputs, label_batch=labels)
 
             itered_num += 1
@@ -77,11 +78,8 @@ class Client():
         edgeserver.receive_from_client(client_id=self.id,
                                        cshared_state_dict=copy.deepcopy(self.model.shared_layers.state_dict()))
 
-        return None
-
     def receive_from_edgeserver(self, shared_state_dict):
         self.receiver_buffer = shared_state_dict
-        return None
 
     def sync_with_edgeserver(self):
         """
@@ -90,11 +88,3 @@ class Client():
         """
         # self.model.shared_layers.load_state_dict(self.receiver_buffer)
         self.model.update_model(self.receiver_buffer)
-        return None
-
-    # 客户计算上行链路传输速率
-    def calRateOfUplink(self, X, Q, K, W):
-        # 计算上行链路的传输速率
-        r_client = log(self.p * self.h / pow(self.sigma, 2), 2)
-        r_edge = X * Q * W / K
-        return r_client * r_edge
