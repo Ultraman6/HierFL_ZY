@@ -7,7 +7,8 @@
 # 5. Server receives the aggregated information from the cloud server
 
 import copy
-from average import average_weights
+from average import average_weights, models_are_equal
+
 
 class Edge():
 
@@ -29,8 +30,8 @@ class Edge():
         """
         self.id = id
         self.cids = cids
-        self.receiver_buffer = {}
-        self.shared_state_dict = {}
+        self.receiver_buffer = {}  # 暂存客户端上传的模型参数
+        self.shared_state_dict = {}  # 全局模型参数
         self.id_registration = []
         self.sample_registration = {}
         self.all_trainsample_num = 0
@@ -62,9 +63,12 @@ class Edge():
         :return:
         """
         received_dict = [dict for dict in self.receiver_buffer.values()]
+        # print(models_are_equal(self.receiver_buffer[self.cids[0]], self.receiver_buffer[self.cids[1]]))
         sample_num = [snum for snum in self.sample_registration.values()]
+        # d1 = copy.deepcopy(self.shared_state_dict)
         self.shared_state_dict = average_weights(w = received_dict,
                                                  s_num= sample_num)
+        # print(models_are_equal(self.shared_state_dict, d1))
 
     def send_to_client(self, client):
         client.receive_from_edgeserver(copy.deepcopy(self.shared_state_dict))
@@ -77,6 +81,7 @@ class Edge():
         return None
 
     def receive_from_cloudserver(self, shared_state_dict):
+        # print(models_are_equal(shared_state_dict, self.shared_state_dict))
         self.shared_state_dict = shared_state_dict
         return None
 

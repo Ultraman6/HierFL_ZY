@@ -47,13 +47,13 @@ def args_parser():
     parser.add_argument(
         '--num_workers',
         type = int,
-        default = 8,
+        default = 4,
         help = 'numworks for dataloader'
     )
     parser.add_argument(
         '--test_ratio',
         type = int,
-        default = 0.2,
+        default = 1,
         help = 'ratio of test dataset'
     )
     # -------------云聚合轮次、边缘聚合轮次、本地更新轮次
@@ -122,7 +122,7 @@ def args_parser():
     parser.add_argument(
         '--niid_share',
         type = int,
-        default = 0,
+        default = 1,
         help = '1 表示开启共享niid缓解， 0表示关闭. 该参数将直接影响初始数据划分和训练前给客户并入数据'
     )
     parser.add_argument(

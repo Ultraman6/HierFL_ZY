@@ -4,7 +4,8 @@
 # 2. Server reveives updates from the user
 # 3. Server send the aggregated information back to clients
 import copy
-from average import average_weights
+from average import average_weights, models_are_equal
+
 
 class Cloud():
 
@@ -33,9 +34,12 @@ class Cloud():
 
     def aggregate(self, args):
         received_dict = [dict for dict in self.receiver_buffer.values()]
+        # print(models_are_equal(received_dict[0], received_dict[1]))
         sample_num = [snum for snum in self.sample_registration.values()]
         self.shared_state_dict = average_weights(w=received_dict,
                                                  s_num=sample_num)
+        # print(models_are_equal(received_dict[0], self.shared_state_dict))
+        # print(models_are_equal(received_dict[1], self.shared_state_dict))
         return None
 
     def send_to_edge(self, edge):

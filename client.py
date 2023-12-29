@@ -11,6 +11,7 @@ from torch.autograd import Variable
 import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
+from average import models_are_equal
 from models.initialize_model import initialize_model
 import copy
 
@@ -39,25 +40,32 @@ class Client():
     def local_update(self, num_iter, device):
         itered_num = 0
         loss = 0.0
-        # 一次本地更新不会超过 1000 次迭代
+        end = False
+        # the upperbound selected in the following is because it is expected that one local update will never reach 1000
         for epoch in range(1000):
-            # 使用私有数据进行训练
-            # print("使用私有数据进行训练")
             for data in self.train_loader:
                 inputs, labels = data
-                inputs, labels = inputs.to(device), labels.to(device)
-                loss += self.model.optimize_model(input_batch=inputs, label_batch=labels)
-
-            itered_num += 1
-            if itered_num >= num_iter:
-                self.epoch += 1
-                self.model.exp_lr_sheduler(epoch=self.epoch)
-                return loss / itered_num  # 返回平均损失
-
+                inputs = inputs.to(device)
+                labels = labels.to(device)
+                # print("学习了样本label", labels)
+                loss += self.model.optimize_model(input_batch=inputs,
+                                                  label_batch=labels)
+                itered_num += 1
+                if itered_num >= num_iter:
+                    end = True
+                    # print(f"Iterer number {itered_num}")
+                    self.epoch += 1
+                    self.model.exp_lr_sheduler(epoch=self.epoch)
+                    # self.model.print_current_lr()
+                    break
+            if end: break
             self.epoch += 1
-            self.model.exp_lr_sheduler(epoch=self.epoch)
-
-        return loss / itered_num  # 返回平均损失
+            self.model.exp_lr_sheduler(epoch = self.epoch)
+            # self.model.print_current_lr()
+        # print(itered_num)
+        # print(f'The {self.epoch}')
+        loss /= num_iter
+        return loss
 
     def test_model(self, device):
         correct = 0.0
@@ -86,5 +94,6 @@ class Client():
         The global has already been stored in the buffer
         :return: None
         """
+        # print(models_are_equal(self.receiver_buffer, self.model.shared_layers.state_dict()))
         # self.model.shared_layers.load_state_dict(self.receiver_buffer)
         self.model.update_model(self.receiver_buffer)

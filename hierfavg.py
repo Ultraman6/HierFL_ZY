@@ -2,10 +2,12 @@
 # Client update(t_1) -> Edge Aggregate(t_2) -> Cloud Aggregate(t_3)
 import json
 import time
+from threading import Thread
 
 from matplotlib import pyplot as plt
 from torch import multiprocessing
 
+from average import models_are_equal
 from options import args_parser
 from tensorboardX import SummaryWriter
 import torch
@@ -262,6 +264,9 @@ def HierFAVG(args):
                 print(shared_data_distribution)
         else:
             print("Edges  has no shared data")
+        print("Cloud valid data size: {}".format(len(v_test_loader.dataset)))
+        valid_data_distribution = show_distribution(v_test_loader, args)
+        print("Cloud valid data distribution: {}".format(valid_data_distribution))
 
     # 读取mapping配置信息
     mapping = None
@@ -356,59 +361,29 @@ def HierFAVG(args):
         [cloud.edge_register(edge=edge) for edge in edges]
         all_loss_sum = 0.0
         all_acc_sum = 0.0
-        print(f"Communication round {num_comm}")
+        print(f"云端更新   第 {num_comm} 轮")
         for num_edgeagg in range(args.num_edge_aggregation):  # 边缘聚合
-            print(f"Edge aggregation round {num_edgeagg}")
-            edge_loss = [0.0] * args.num_edges
-            edge_sample = [0] * args.num_edges
-            correct_all = 0.0
-            total_all = 0.0
-            # no edge selection included here
-            # for each edge, iterate
-            # print(edges)
-            for i, edge in enumerate(edges):  # 边缘迭代
-                print(f"Edge {i} 开始迭代")
-                # edge.refresh_edgeserver()
-                # client_loss = 0.0  # 边缘下client的总loss
+            print(f"边缘更新   第 {num_edgeagg} 轮")
+            # 多线程的边缘迭代
+            edge_threads = []
+            edge_loss = [0.0] * len(edges)
+            edge_sample = [0] * len(edges)
+            for edge in edges:
+                edge_thread = Thread(target=process_edge, args=(edge, clients, args, device, edge_loss, edge_sample))
+                edge_threads.append(edge_thread)
+                edge_thread.start()
+            for edge_thread in edge_threads:
+                edge_thread.join()
+            # 统计边缘迭代的损失和样本
+            total_samples = sum(edge_sample)
+            if total_samples > 0:
+                all_loss = sum([e_loss * e_sample for e_loss, e_sample in zip(edge_loss, edge_sample)]) / total_samples
+                all_loss_sum += all_loss
+            else:
+                print("Warning: Total number of samples is zero. Cannot compute all_loss.")
+            print("train loss per edge on all samples: {}".format(edge_loss))
 
-                # 创建一个进程列表
-                processes = []
-                # 准备用于存储结果的管理器字典
-                manager = mp.Manager()
-                return_dict = manager.dict()
-                for selected_cid in edge.cids:
-                    # 下行链路
-                    client = clients[selected_cid]
-                    proc = mp.Process(target=train_client,
-                                      args=(client, edge, args.num_local_update, device, return_dict, selected_cid))
-                    processes.append(proc)
-                    proc.start()
-                    # edge.send_to_client(clients[selected_cid])
-                    # clients[selected_cid].sync_with_edgeserver()
-                    # client_loss += clients[selected_cid].local_update(num_iter=args.num_local_update,
-                    #                                                   device=device)
-                    clients[selected_cid].send_to_edgeserver(edge)  # 上传梯度
-                # 等待所有进程完成
-                for proc in processes:
-                    proc.join()
-                # 边缘训练损失
-                edge_loss[i] = sum(return_dict.values())
-                edge_sample[i] = sum(edge.sample_registration.values())
-                print(f"Edge {i} 聚合")
-                edge.aggregate(args)
-
-                # 边缘测试精度
-                # correct, total = all_clients_test(edge, clients, edge.cids, device)
-                # correct_all += correct
-                # total_all += total
-
-            # 结束边缘迭代
-            all_loss = sum([e_loss * e_sample for e_loss, e_sample in zip(edge_loss, edge_sample)]) / sum(edge_sample)
-            all_loss_sum += all_loss
-            # avg_acc = correct_all / total_all
-            # print(f"correct_all: {correct_all}, total_all: {total_all}, avg_acc: {avg_acc}")
-            # all_acc_sum += avg_acc
-
+        print(models_are_equal(edges[0].shared_state_dict, edges[1].shared_state_dict))
         # 开始云端聚合
         for edge in edges:
             edge.send_to_cloudserver(cloud)
@@ -416,8 +391,6 @@ def HierFAVG(args):
         cloud.aggregate(args)
         for edge in edges:
             cloud.send_to_edge(edge)
-        # accs_edge_avg.append(all_acc_sum / args.num_edge_aggregation)
-        # losses_edge_avg.append(all_loss_sum / args.num_edge_aggregation)
         global_nn.load_state_dict(state_dict=copy.deepcopy(cloud.shared_state_dict))
         global_nn.train(False)
 
@@ -425,7 +398,7 @@ def HierFAVG(args):
         print(f"Cloud 测试")
         correct_all_v, total_all_v = fast_all_clients_test(v_test_loader, global_nn, device)
         avg_acc_v = correct_all_v / total_all_v  # 测试精度
-
+        print('Cloud Valid Accuracy {}'.format(avg_acc_v))
         # 在轮次结束时记录相对于开始时间的时间差, 记录云端轮的测试精度
         times.append(time.time() - start_time)
         accs_cloud.append(avg_acc_v)
@@ -440,18 +413,44 @@ def HierFAVG(args):
 
 
 def train_client(client, edge, num_iter, device, return_dict, client_id):
+    print(f"Client {client.id} 本地迭代开始")
     # 如果设备是GPU，则设置相应的CUDA设备
     if device.type == 'cuda':
         torch.cuda.set_device(device)
     # 客户端与边缘服务器同步
     edge.send_to_client(client)
     client.sync_with_edgeserver()
-    # 执行本地更新
+    # 执行本地迭代
     client_loss = client.local_update(num_iter=num_iter, device=device)
-    # 将更新后的模型发送回边缘服务器
+    # 将迭代后的模型发送回边缘服务器
     client.send_to_edgeserver(edge)
     # 存储结果
     return_dict[client_id] = client_loss
+    print(f"Client {client.id} 本地迭代结束")
+
+def process_edge(edge, clients, args, device, edge_loss, edge_sample):
+    # 一次边缘迭更新 = n个本地迭代+ 一次边缘聚合
+    # print(f"Edge {edge.id} 边缘更新开始")
+    # 使用多线程进行客户迭代
+    threads = []
+    return_dict = {}  # 在线程中，可以直接使用普通字典
+    for selected_cid in edge.cids:
+        client = clients[selected_cid]
+        thread = Thread(target=train_client,
+                        args=(client, edge, args.num_local_update, device, return_dict, selected_cid))
+        threads.append(thread)
+        thread.start()
+    # 等待所有线程完成
+    for thread in threads:
+        thread.join()
+    # 边缘聚合
+    # print(f"Edge {edge.id} 边缘聚合开始")
+    edge.aggregate(args)
+    # print(f"Edge {edge.id} 边缘聚合结束")
+    # 更新边缘训练损失
+    edge_loss[edge.id] = sum(return_dict.values())
+    edge_sample[edge.id] = sum(edge.sample_registration.values())
+    # print(f"Edge {edge.id} 边缘更新结束")
 
 
 def main():
