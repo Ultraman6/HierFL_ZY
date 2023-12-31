@@ -413,7 +413,7 @@ def HierFAVG(args):
 
 
 def train_client(client, edge, num_iter, device, return_dict, client_id):
-    print(f"Client {client.id} 本地迭代开始")
+    # print(f"Client {client.id} 本地迭代开始")
     # 如果设备是GPU，则设置相应的CUDA设备
     if torch.cuda.is_available():
         torch.cuda.set_device("cuda:0")  # 确保在每个线程中设置GPU
@@ -426,7 +426,7 @@ def train_client(client, edge, num_iter, device, return_dict, client_id):
     client.send_to_edgeserver(edge)
     # 存储结果
     return_dict[client_id] = client_loss
-    print(f"Client {client.id} 本地迭代结束")
+    # print(f"Client {client.id} 本地迭代结束")
 
 def process_edge(edge, clients, args, device, edge_loss, edge_sample):
     # 一次边缘迭更新 = n个本地迭代+ 一次边缘聚合
