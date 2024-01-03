@@ -155,7 +155,7 @@ def args_parser():
     parser.add_argument(
         '--num_clients',
         type = int,
-        default = 20,
+        default = 30,
         help = 'number of all available clients'
     )
     parser.add_argument(
@@ -271,6 +271,37 @@ def args_parser():
         help = 'mapping of edges and their clients'
     )
 
+    # synthetic数据集用参数
+    parser.add_argument(
+        '--mode',
+        type = float,
+        default = 1,
+        help = '1 means mapping is active, 0 means mapping is inactive'
+    )
+    # parser.add_argument(
+    #     '--beta',
+    #     type = float,
+    #     default = 1,
+    #     help = '1 means mapping is active, 0 means mapping is inactive'
+    # )
+    # parser.add_argument(
+    #     '--syn_iid',
+    #     type = int,
+    #     default = -1,
+    #     help = '1 means mapping is active, 0 means mapping is inactive'
+    # )
+    # parser.add_argument(
+    #     '--dimension',
+    #     type = int,
+    #     default = 60,
+    #     help = '1 means mapping is active, 0 means mapping is inactive'
+    # )
+    # parser.add_argument(
+    #     '--num_class',
+    #     type = int,
+    #     default = 10,
+    #     help = '1 means mapping is active, 0 means mapping is inactive'
+    # )
 
     args = parser.parse_args()
     args.cuda = torch.cuda.is_available()
