@@ -115,49 +115,92 @@ def iid_nesize_split(dataset, args, kwargs, is_shuffle=True):
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
                                      batch_size=args.train_batch_size,
                                      shuffle=is_shuffle, **kwargs)
-
     return data_loaders
 
 
-def niid_esize_split(dataset, args, kwargs, is_shuffle=True):
+# def niid_control_split(dataset, args, kwargs, is_shuffle=True):
+#     data_loaders = [0] * args.num_clients
+#     num_shards = 2 * args.num_clients
+#     num_imgs = int(len(dataset) / num_shards)
+#     idx_shard = [i for i in range(num_shards)]
+#     dict_users = {i: np.array([]) for i in range(args.num_clients)}
+#     idxs = np.arange(num_shards * num_imgs)
+#     # is_shuffle is used to differentiate between train and test
+# # niid shards划分方法
+#     if args.dataset != "femnist":
+#         # original
+#         # editer: Ultraman6 20230928
+#         # torch>=1.4.0
+#         labels = dataset.targets
+#         idxs_labels = np.vstack((idxs, labels))
+#         idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
+#         # sort the data according to their label
+#         idxs = idxs_labels[0, :]
+#         idxs = idxs.astype(int)
+#     else:
+#         # custom
+#         labels = np.array(dataset.targets)  # 将labels转换为NumPy数组
+#         idxs_labels = np.vstack((idxs[:len(labels)], labels[:len(idxs)]))
+#         idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
+#         idxs = idxs_labels[0, :]
+#         idxs = idxs.astype(int)
+#
+#     # Additional step for client mixing based on experiment_niid_level
+#     client_idxs = list(dict_users.keys())
+#     num_clients_for_fixed_distribution = int(len(client_idxs) * args.experiment_niid_level)
+#
+#     fixed_distribution_clients = client_idxs[:num_clients_for_fixed_distribution]
+#     remaining_clients = client_idxs[num_clients_for_fixed_distribution:]
+#     np.random.shuffle(remaining_clients)
+#
+#     mixed_client_order = fixed_distribution_clients + remaining_clients
+#
+#     mixed_dict_users = {new_idx: dict_users[old_idx] for new_idx, old_idx in enumerate(mixed_client_order)}
+#     mixed_data_loaders = [0] * args.num_clients
+#
+#     for i in range(args.num_clients):
+#         mixed_data_loaders[i] = DataLoader(DatasetSplit(dataset, mixed_dict_users[i]),
+#                                            batch_size=args.train_batch_size,
+#                                            shuffle=is_shuffle, **kwargs)
+#
+#     return data_loaders
+
+def niid_control_split(dataset, args, kwargs, is_shuffle=True):
     data_loaders = [0] * args.num_clients
-    # each client has only two classes of the network
-    num_shards = 2 * args.num_clients
-    # the number of images in one shard
-    num_imgs = int(len(dataset) / num_shards)
-    idx_shard = [i for i in range(num_shards)]
     dict_users = {i: np.array([]) for i in range(args.num_clients)}
-    idxs = np.arange(num_shards * num_imgs)
-    # is_shuffle is used to differentiate between train and test
+    idxs = np.arange(len(dataset))
+    labels = np.array(dataset.targets)
 
-    if args.dataset != "femnist":
-        # original
-        # editer: Ultraman6 20230928
-        # torch>=1.4.0
-        labels = dataset.targets
-        idxs_labels = np.vstack((idxs, labels))
-        idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
-        # sort the data according to their label
-        idxs = idxs_labels[0, :]
-        idxs = idxs.astype(int)
-    else:
-        # custom
-        labels = np.array(dataset.targets)  # 将labels转换为NumPy数组
-        idxs_labels = np.vstack((idxs[:len(labels)], labels[:len(idxs)]))
-        idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
-        idxs = idxs_labels[0, :]
-        idxs = idxs.astype(int)
+    # Sort the data according to their label
+    idxs_labels = np.vstack((idxs, labels))
+    idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
+    idxs = idxs_labels[0, :]
 
-    # divide and assign
+    # Divide and assign
     for i in range(args.num_clients):
-        rand_set = set(np.random.choice(idx_shard, 2, replace=False))
-        idx_shard = list(set(idx_shard) - rand_set)
-        for rand in rand_set:
-            dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs: (rand + 1) * num_imgs]), axis=0)
-            dict_users[i] = dict_users[i].astype(int)
+        num_samples = len(idxs) // args.num_clients
+        start_idx = i * num_samples
+        end_idx = (i + 1) * num_samples if i != args.num_clients - 1 else len(idxs)
+        dict_users[i] = idxs[start_idx:end_idx]
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
                                      batch_size=args.train_batch_size,
                                      shuffle=is_shuffle, **kwargs)
+
+    # Apply controlled NIID partition if specified
+    if args.experiment_niid_level > 0:
+        sorted_clients_idx = sorted(dict_users, key=lambda k: len(dict_users[k]), reverse=True)
+        x_partition_idx = round(args.num_clients * args.experiment_niid_level)
+        x_sorted_clients = sorted_clients_idx[:x_partition_idx]
+        remaining_clients = sorted_clients_idx[x_partition_idx:]
+        np.random.shuffle(remaining_clients)
+        mixed_clients = np.concatenate((x_sorted_clients, remaining_clients), axis=0)
+
+        # Reassign the data loaders
+        for idx, client_idx in enumerate(mixed_clients):
+            data_loaders[idx] = DataLoader(DatasetSplit(dataset, dict_users[client_idx]),
+                                           batch_size=args.train_batch_size,
+                                           shuffle=is_shuffle, **kwargs)
+
     return data_loaders
 
 
@@ -333,7 +376,7 @@ def split_data(dataset, args, kwargs, is_shuffle=True):
     if args.iid == 1:
         data_loaders = iid_esize_split(dataset, args, kwargs, is_shuffle)
     elif args.iid == 0:
-        data_loaders = niid_esize_split(dataset, args, kwargs, is_shuffle)
+        data_loaders = niid_control_split(dataset, args, kwargs, is_shuffle)
     elif args.iid == -1:
         data_loaders = iid_nesize_split(dataset, args, kwargs, is_shuffle)
     elif args.iid == -2:
@@ -464,7 +507,7 @@ def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_comple
                             download=True, transform=transform_test)
 
     # 根据 args.share_niid 的值创建共享数据加载器
-    if args.share_niid == 1:
+    if args.niid_share == 1:
         share_loaders = create_shared_data_loaders(train, args)
     else:
         share_loaders = [None] * args.num_edges

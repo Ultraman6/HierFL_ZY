@@ -302,14 +302,39 @@ def HierFAVG(args):
             client_class_dis = get_client_class(args, clients)
             edges, p_clients = initialize_edges_iid(num_edges=args.num_edges,
                                                     clients=clients,
-                                                    args=args,
+                                                    # args=args,
                                                     client_class_dis=client_class_dis)
         elif args.edgeiid == 0:
             client_class_dis = get_client_class(args, clients)
             edges, p_clients = initialize_edges_niid(num_edges=args.num_edges,
                                                      clients=clients,
-                                                     args=args,
+                                                     # args=args,
                                                      client_class_dis=client_class_dis)
+        else:
+            # This is randomly assign the clients to edges
+            for i in range(args.num_edges):
+                if args.active_mapping == 1:
+                    # 根据映射关系进行选择
+                    selected_cids = mapping[str(i)]
+                else:
+                    # Randomly select clients and assign them
+                    if i == args.num_edges - 1:  # 客户端数非边缘数的整数倍情况
+                        selected_cids = cids
+                    else:
+                        selected_cids = np.random.choice(cids, clients_per_edge, replace=False)
+                print(f"Edge {i} has clients {selected_cids}")
+                cids = list(set(cids) - set(selected_cids))
+                edges.append(Edge(id=i, cids=selected_cids,
+                                  shared_layers=copy.deepcopy(clients[0].model.shared_layers),
+                                  share_dataloader=share_loaders[i]))
+
+                # 注册客户信息并按需把共享数据集给到客户端
+                for cid in selected_cids:
+                    edges[i].client_register(clients[cid])
+
+                edges[i].all_trainsample_num = sum(edges[i].sample_registration.values())
+                p_clients[i] = [sample / float(edges[i].all_trainsample_num) for sample in
+                                list(edges[i].sample_registration.values())]
     else:
         # This is randomly assign the clients to edges
         for i in range(args.num_edges):

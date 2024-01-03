@@ -10,19 +10,19 @@ def args_parser():
     parser.add_argument(
         '--dataset',
         type = str,
-        default = 'mnist',
+        default = 'cifar10',
         help = 'name of the dataset: mnist, cifar10, femnist'
     )
     parser.add_argument(
         '--model',
         type = str,
-        default = 'cnn',
+        default = 'cnn_complex',
         help='name of model. mnist: logistic, lenet, cnn; cifar10: resnet18, cnn_complex; femnist: logistic, lenet, cnn'
     )
     parser.add_argument(
         '--input_channels',
         type = int,
-        default = 1,
+        default = 3,
         help = 'input channels. femnist:1, mnist:1, cifar10 :3'
     )
     parser.add_argument(
@@ -60,7 +60,7 @@ def args_parser():
     parser.add_argument(
         '--num_communication',
         type = int,
-        default=5,
+        default=100,
         help = 'number of communication rounds with the cloud server'
     )
     parser.add_argument(
@@ -72,7 +72,7 @@ def args_parser():
     parser.add_argument(
         '--num_local_update',
         type=int,
-        default=2,
+        default=1,
         help='number of local update (K_1)'
     )
     parser.add_argument(
@@ -115,8 +115,22 @@ def args_parser():
     parser.add_argument(
         '--iid',
         type = int,
-        default = 0,
+        default = -2,
         help = 'distribution of the data, 1,0,-1,-2 分别表示iid同大小、niid同大小、iid不同大小、niid同大小且仅一类(one-class)'
+    )
+    # parser.add_argument(
+    #     '--partition_alpha',
+    #     type = int,
+    #     default = 0.5,
+    #     help = 'experiment_niid_level = 1 means that the data is niid '
+    # )
+    parser.add_argument(
+        '--niid_level',
+        type = int,
+        default = 0,
+        help = 'experiment_niid_level = 1 means that the data is niid '
+               'experiment_niid_level = 0 means that the data is iid'
+               'experiment_niid_level = (0,1) e.g. 0.7 means that the data is partially niid'
     )
     # 缓解niid策略——每个edge共享数据给足下客户
     parser.add_argument(
@@ -128,8 +142,8 @@ def args_parser():
     parser.add_argument(
         '--edgeiid',   # 只有在客户数 = 10倍的边缘数才生效
         type=int,
-        default = 1,
-        help='distribution of the data under edges, 1 (edgeiid),0 (edgeniid) (used only when iid = -2)'
+        default = -1,
+        help='distribution of the data under edges, 1 (edgeiid),0 (edgeniid) -1 (none) (used only when iid = -2)'
     )
     parser.add_argument(
         '--frac',
@@ -141,13 +155,13 @@ def args_parser():
     parser.add_argument(
         '--num_clients',
         type = int,
-        default = 5,
+        default = 20,
         help = 'number of all available clients'
     )
     parser.add_argument(
         '--num_edges',
         type = int,
-        default= 2,
+        default= 3,
         help= 'number of edges'
     )
 
@@ -202,9 +216,10 @@ def args_parser():
     parser.add_argument(
         '--classes_per_client',
         type=int,
-        default = 2,
+        default = 1,
         help='under artificial non-iid distribution, the classes per client'
     )
+
     parser.add_argument(
         '--gpu',
         type = int,
@@ -242,9 +257,11 @@ def args_parser():
         help = '1 means mapping is active, 0 means mapping is inactive'
     )
     mapping = {
-        "0": [0, 1, 2],
-        "1": [3, 4]
+        "0": [0, 1, 2, 13, 14, 15, 18],
+        "1": [3, 4, 5, 10, 11, 16],
+        "2": [6, 7, 8, 9, 12, 17, 19],
     }
+
     # 将映射关系转换为JSON格式
     mapping_json = json.dumps(mapping)
     parser.add_argument(
