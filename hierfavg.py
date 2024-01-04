@@ -277,6 +277,13 @@ def HierFAVG(args):
         # 提取映射关系参数并将其解析为JSON对象
         mapping = json.loads(args.mapping)
 
+    # 读取attack_mapping配置信息
+    attack_mapping = None
+    if args.attack_flag == 1: # 表示开启模型攻击
+        # 提取映射关系参数并将其解析为JSON对象
+        attack_mapping = json.loads(args.attack_mapping)
+
+
     # 初始化 客户集 和 边缘服务器集
     clients = []
     for i in range(args.num_clients):
@@ -326,8 +333,14 @@ def HierFAVG(args):
                     else:
                         selected_cids = np.random.choice(cids, clients_per_edge, replace=False)
                 print(f"Edge {i} has clients {selected_cids}")
+
+                if args.attack_flag == 1: # 如果开启了模型攻击，就要构造每个edge的scids
+                    selfish_cids = attack_mapping[str(i)]
+                else:  selfish_cids = []
+                print(f"Edge {i} has selfish clients {selfish_cids}")
+
                 cids = list(set(cids) - set(selected_cids))
-                edges.append(Edge(id=i, cids=selected_cids,
+                edges.append(Edge(id=i, cids=selected_cids, scids=selfish_cids,
                                   shared_layers=copy.deepcopy(clients[0].model.shared_layers),
                                   share_dataloader=share_loaders[i]))
 
@@ -473,7 +486,7 @@ def process_edge(edge, clients, args, device, edge_loss, edge_sample):
         thread.join()
     # 边缘聚合
     # print(f"Edge {edge.id} 边缘聚合开始")
-    edge.aggregate(args)
+    edge.aggregate(args, device)
     # print(f"Edge {edge.id} 边缘聚合结束")
     # 更新边缘训练损失
     edge_loss[edge.id] = sum(return_dict.values())

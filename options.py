@@ -262,7 +262,6 @@ def args_parser():
         "1": [3, 4, 5, 10, 11, 16],
         "2": [6, 7, 8, 9, 12, 17, 19],
     }
-
     # 将映射关系转换为JSON格式
     mapping_json = json.dumps(mapping)
     parser.add_argument(
@@ -302,6 +301,34 @@ def args_parser():
         type = int,
         default = 10,
         help = '1 means mapping is active, 0 means mapping is inactive'
+    )
+
+
+    # 模型攻击参数
+    parser.add_argument(
+        '--attack_flag',
+        type = int,
+        default = 1,
+        help = 'trigger of attack,1 means on 0 means off'
+    )
+    attack_mapping = {
+        "0": [0, 2],
+        "1": [3],
+        "2": [8],
+    }
+    # 将映射关系转换为JSON格式
+    attack_mapping_json = json.dumps(attack_mapping)
+    parser.add_argument(
+        '--attack_mapping',
+        type = str,
+        default = attack_mapping_json,
+        help = 'mapping of edges and their selfish clients'
+    )
+    parser.add_argument(
+        '--attack_mode',
+        type = str,
+        default = "flip",
+        help = 'mode of attack, such as: zero、random、flip'
     )
 
     args = parser.parse_args()

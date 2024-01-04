@@ -33,13 +33,8 @@ class Cloud():
         return None
 
     def aggregate(self, args):
-        received_dict = [dict for dict in self.receiver_buffer.values()]
-        # print(models_are_equal(received_dict[0], received_dict[1]))
-        sample_num = [snum for snum in self.sample_registration.values()]
-        self.shared_state_dict = average_weights(w=received_dict,
-                                                 s_num=sample_num)
-        # print(models_are_equal(received_dict[0], self.shared_state_dict))
-        # print(models_are_equal(received_dict[1], self.shared_state_dict))
+        received_dict = [(self.sample_registration[eid], dict) for eid, dict in self.receiver_buffer.items()]
+        self.shared_state_dict = average_weights(received_dict)
         return None
 
     def send_to_edge(self, edge):

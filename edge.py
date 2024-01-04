@@ -7,12 +7,14 @@
 # 5. Server receives the aggregated information from the cloud server
 
 import copy
+
+from attack.byzantine_attack import perform_byzantine_attack
 from average import average_weights, models_are_equal
 
 
 class Edge():
 
-    def __init__(self, id, cids, shared_layers, share_dataloader=None):
+    def __init__(self, id, cids, scids, shared_layers, share_dataloader=None):
         """
         id: edge id
         cids: ids of the clients under this edge
@@ -30,6 +32,7 @@ class Edge():
         """
         self.id = id
         self.cids = cids
+        self.scids = scids  # 暂存自私客户
         self.receiver_buffer = {}  # 暂存客户端上传的模型参数
         self.shared_state_dict = {}  # 全局模型参数
         self.id_registration = []
@@ -56,19 +59,16 @@ class Edge():
         self.receiver_buffer[client_id] = cshared_state_dict
         return None
 
-    def aggregate(self, args):
-        """
-        Using the old aggregation funciton
-        :param args:
-        :return:
-        """
-        received_dict = [dict for dict in self.receiver_buffer.values()]
-        # print(models_are_equal(self.receiver_buffer[self.cids[0]], self.receiver_buffer[self.cids[1]]))
-        sample_num = [snum for snum in self.sample_registration.values()]
-        # d1 = copy.deepcopy(self.shared_state_dict)
-        self.shared_state_dict = average_weights(w = received_dict,
-                                                 s_num= sample_num)
-        # print(models_are_equal(self.shared_state_dict, d1))
+    def aggregate(self, args, device):
+        # Check if the attack is enabled and perform the attack if necessary
+        if args.attack_flag == 1:  # 判断是否开启模型攻击
+            attack_mode = args.attack_mode  # 构造字典，包含每个客户的数据量和本地模型参数
+            received_dict = {cid:(self.sample_registration[cid], dict) for cid, dict in self.receiver_buffer.items()}
+            self.shared_state_dict = average_weights(perform_byzantine_attack(received_dict, self.scids, attack_mode, device))
+        else:   # 构造列表，包含(数据量，本地模型参数)的元组
+            received_dict = [(self.sample_registration[cid], dict) for cid, dict in self.receiver_buffer.items()]
+            self.shared_state_dict = average_weights(received_dict)
+        return None
 
     def send_to_client(self, client):
         client.receive_from_edgeserver(copy.deepcopy(self.shared_state_dict))
