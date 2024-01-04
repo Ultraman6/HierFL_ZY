@@ -146,6 +146,10 @@ def initialize_model(args, device):
                 specific_layers = None
             else:
                 raise ValueError('Model not implemented for MNIST')
+        elif args.dataset == 'synthetic':
+            if args.model == 'logistic':
+               shared_layers = LogisticRegression(args.dimension, args.num_class)
+               specific_layers = None
         else:
             raise ValueError('The dataset is not implemented for mtl yet')
         if args.cuda:

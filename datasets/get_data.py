@@ -1,4 +1,5 @@
 from datasets.cifar_mnist import show_distribution, get_mnist, get_cifar10, get_femnist
+from datasets.synthetic import get_synthetic
 
 
 def get_dataset(dataset_root, dataset, args):
@@ -9,14 +10,8 @@ def get_dataset(dataset_root, dataset, args):
         train_loaders, test_loaders, share_data_edge, v_test_loader = get_cifar10(dataset_root, args)
     elif dataset == 'femnist':
         train_loaders, test_loaders, share_data_edge, v_test_loader = get_femnist(dataset_root, args)
-    elif dataset == 'synthetic_0.5_0.5':
-        train_loaders, test_loaders, share_data_edge, v_test_loader = get_synthetic(dataset_root, args)
-    elif dataset == 'synthetic_0_0':
-        train_loaders, test_loaders, share_data_edge, v_test_loader = get_synthetic(dataset_root, args)
-    elif dataset == 'synthetic_1_1':
-        train_loaders, test_loaders, share_data_edge, v_test_loader = get_synthetic(dataset_root, args)
-    elif dataset == 'synthetic_iid':
-        train_loaders, test_loaders, share_data_edge, v_test_loader = get_synthetic(dataset_root, args)
+    elif dataset == 'synthetic':
+        train_loaders, test_loaders, share_data_edge, v_test_loader = get_synthetic(args)
     else:
         raise ValueError('Dataset `{}` not found'.format(dataset))
     return train_loaders, test_loaders, share_data_edge, v_test_loader

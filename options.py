@@ -10,14 +10,15 @@ def args_parser():
     parser.add_argument(
         '--dataset',
         type = str,
-        default = 'cifar10',
-        help = 'name of the dataset: mnist, cifar10, femnist'
+        default = 'synthetic',
+        help = 'name of the dataset: mnist, cifar10, femnist, synthetic'
     )
     parser.add_argument(
         '--model',
         type = str,
-        default = 'cnn_complex',
-        help='name of model. mnist: logistic, lenet, cnn; cifar10: resnet18, cnn_complex; femnist: logistic, lenet, cnn'
+        default = 'logistic',
+        help='name of model. mnist: logistic, lenet, cnn; '
+             'cifar10: resnet18, cnn_complex; femnist: logistic, lenet, cnn; synthetic:lr'
     )
     parser.add_argument(
         '--input_channels',
@@ -273,35 +274,35 @@ def args_parser():
 
     # synthetic数据集用参数
     parser.add_argument(
-        '--mode',
+        '--alpha',
+        type = int,
+        default = 1,
+        help = 'means the mean of distributions among clients'
+    )
+    parser.add_argument(
+        '--beta',
         type = float,
         default = 1,
-        help = '1 means mapping is active, 0 means mapping is inactive'
+        help = 'means the variance  of distributions among clients'
     )
-    # parser.add_argument(
-    #     '--beta',
-    #     type = float,
-    #     default = 1,
-    #     help = '1 means mapping is active, 0 means mapping is inactive'
-    # )
     # parser.add_argument(
     #     '--syn_iid',
     #     type = int,
     #     default = -1,
     #     help = '1 means mapping is active, 0 means mapping is inactive'
     # )
-    # parser.add_argument(
-    #     '--dimension',
-    #     type = int,
-    #     default = 60,
-    #     help = '1 means mapping is active, 0 means mapping is inactive'
-    # )
-    # parser.add_argument(
-    #     '--num_class',
-    #     type = int,
-    #     default = 10,
-    #     help = '1 means mapping is active, 0 means mapping is inactive'
-    # )
+    parser.add_argument(
+        '--dimension',
+        type = int,
+        default = 60,
+        help = '1 means mapping is active, 0 means mapping is inactive'
+    )
+    parser.add_argument(
+        '--num_class',
+        type = int,
+        default = 10,
+        help = '1 means mapping is active, 0 means mapping is inactive'
+    )
 
     args = parser.parse_args()
     args.cuda = torch.cuda.is_available()

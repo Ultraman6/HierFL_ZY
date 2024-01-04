@@ -13,7 +13,7 @@ import torch.utils.data as data
 import torch
 import torch.backends.cudnn as cudnn
 
-from datasets.get_data import get_dataset
+import datasets.get_data
 
 cudnn.banchmark = True
 import torchvision
@@ -406,9 +406,6 @@ def get_mnist(dataset_root, args):
     else:
         share_loaders = [None] * args.num_edges
 
-    # v_test_loader = DataLoader(test, batch_size=args.test_batch_size * args.num_clients,
-    #                            shuffle=False, **kwargs)
-
     test_set_size = len(test)
     subset_size = int(test_set_size * args.test_ratio)  # 例如，保留20%的数据
     # 生成随机索引来创建子集
@@ -542,39 +539,31 @@ def get_femnist(dataset_root, args):
 
 def show_distribution(dataloader, args):
     """
-    show the distribution of the data on certain client with dataloader
-    return:
-        percentage of each class of the label
+    Show the distribution of the data on a certain client with dataloader.
+    Return:
+        Percentage of each class of the label.
     """
-    if args.dataset == 'femnist':
-        labels = dataloader.dataset.dataset.targets
-    elif args.dataset == 'mnist':
-        try:
-            labels = dataloader.dataset.dataset.train_labels.numpy()
-        except:
-            print(f"Using test_labels")
-            labels = dataloader.dataset.dataset.test_labels.numpy()
-        # labels = dataloader.dataset.dataset.train_labels.numpy()
-    elif args.dataset == 'cifar10':
-        try:
-            labels = dataloader.dataset.dataset.targets
-        except:
-            print(f"Using test_labels")
-            labels = dataloader.dataset.dataset.targets
+    # Retrieve labels
+    if args.dataset in ['femnist', 'cifar10', 'mnist', 'synthetic']:
+        labels = [label for _, label in dataloader.dataset]
     elif args.dataset == 'fsdd':
         labels = dataloader.dataset.labels
     else:
         raise ValueError("`{}` dataset not included".format(args.dataset))
-    num_samples = len(dataloader.dataset)
-    # print(num_samples)
-    idxs = [i for i in range(num_samples)]
-    labels = np.array(labels)
-    unique_labels = np.unique(labels)
-    distribution = [0] * len(unique_labels)
-    for idx in idxs:
-        img, label = dataloader.dataset[idx]
+
+    # Ensure labels are numpy array and integer type
+    labels = np.array(labels).astype(int)
+    num_samples = len(labels)
+    max_label = labels.max()
+
+    # Initialize distribution array
+    distribution = np.zeros(max_label + 1)
+
+    # Calculate distribution
+    for label in labels:
         distribution[label] += 1
-    distribution = np.array(distribution)
+
+    # Normalize to get percentages
     distribution = distribution / num_samples
     return distribution
 
@@ -583,7 +572,7 @@ if __name__ == '__main__':
     args = args_parser()
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
-    train_loaders, test_loaders, _, _ = get_dataset(args.dataset_root, args.dataset, args)
+    train_loaders, test_loaders, _, _ = datasets.get_dataset(args.dataset_root, args.dataset, args)
     print(f"The dataset is {args.dataset} divided into {args.num_clients} clients/tasks in an iid = {args.iid} way")
     for i in range(args.num_clients):
         train_loader = train_loaders[i]

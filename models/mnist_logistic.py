@@ -1,11 +1,16 @@
 import torch
 
 class LogisticRegression(torch.nn.Module):
-    def __init__(self, input_dim = 1, output_dim = 10):
+    def __init__(self, input_dim, output_dim=10):
         super(LogisticRegression, self).__init__()
-        self.linear = torch.nn.Linear(input_dim*28*28, output_dim)
+        # No need to multiply input_dim by 28*28 anymore
+        self.linear = torch.nn.Linear(input_dim, output_dim)
 
     def forward(self, x):
-        x = x.view(-1, 784)
-        outputs = self.linear(x)
+        # Adjust the view only if input_dim is 784 (for MNIST)
+        if x.shape[1] != 784:
+            outputs = self.linear(x)
+        else:
+            x = x.view(-1, 784)  # Only reshape for MNIST
+            outputs = self.linear(x)
         return outputs

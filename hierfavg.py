@@ -220,6 +220,9 @@ def initialize_global_nn(args):
             global_nn = ResNet18()
         else:
             raise ValueError(f"Model{args.model} not implemented for cifar")
+    elif args.dataset == 'synthetic':
+        if args.model == 'logistic':
+            global_nn = LogisticRegression(args.dimension, args.num_class)
     else:
         raise ValueError(f"Dataset {args.dataset} Not implemented")
     return global_nn
