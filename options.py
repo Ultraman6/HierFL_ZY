@@ -10,13 +10,13 @@ def args_parser():
     parser.add_argument(
         '--dataset',
         type = str,
-        default = 'synthetic',
+        default = 'cifar10',
         help = 'name of the dataset: mnist, cifar10, femnist, synthetic'
     )
     parser.add_argument(
         '--model',
         type = str,
-        default = 'logistic',
+        default = 'resnet18_YWX',
         help='name of model. mnist: logistic, lenet, cnn; '
              'cifar10: resnet18, cnn_complex; femnist: logistic, lenet, cnn; synthetic:lr'
     )
@@ -79,13 +79,13 @@ def args_parser():
     parser.add_argument(
         '--lr',
         type = float,
-        default = 0.06,
+        default = 0.01,
         help = 'learning rate of the SGD when trained on client'
     )
     parser.add_argument(
         '--lr_decay',
         type = float,
-        default= '1',
+        default= '0',
         help = 'lr decay rate'
     )
     parser.add_argument(
@@ -97,13 +97,13 @@ def args_parser():
     parser.add_argument(
         '--momentum',
         type = float,
-        default = 0,
+        default = 0.9,
         help = 'SGD momentum'
     )
     parser.add_argument(
         '--weight_decay',
         type = float,
-        default = 0,
+        default = 5e-3,
         help= 'The weight decay rate'
     )
     parser.add_argument(
@@ -198,7 +198,8 @@ def args_parser():
     )
 
     # editer: Sensorjang 20230925
-    dataset_root = os.path.join(os.getcwd(), 'train_data')
+    # 设置数据集的根目录为家目录下的 train_data 文件夹
+    dataset_root = os.path.join(os.path.expanduser('~'), 'train_data')
     if not os.path.exists(dataset_root):
         os.makedirs(dataset_root)
 

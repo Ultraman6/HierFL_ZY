@@ -20,7 +20,7 @@ import numpy as np
 from tqdm import tqdm
 from models.mnist_cnn import mnist_lenet, mnist_cnn
 from models.cifar_cnn_3conv_layer import cifar_cnn_3conv
-from models.cifar_resnet import ResNet18
+from models.cifar_resnet import ResNet18, ResNet18_YWX
 from models.mnist_logistic import LogisticRegression
 import os
 import torch.multiprocessing as mp
@@ -218,6 +218,8 @@ def initialize_global_nn(args):
             global_nn = cifar_cnn_3conv(input_channels=3, output_channels=10)
         elif args.model == 'resnet18':
             global_nn = ResNet18()
+        elif args.model == 'resnet18_YWX':
+            global_nn = ResNet18_YWX()
         else:
             raise ValueError(f"Model{args.model} not implemented for cifar")
     elif args.dataset == 'synthetic':

@@ -433,7 +433,7 @@ def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_comple
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ])
-    elif args.model == 'resnet18':
+    elif args.model == 'resnet18' or 'resnet18_YWX':
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),

@@ -2,7 +2,7 @@
 # Include intialization, training for one iteration and test function
 
 from models.cifar_cnn_3conv_layer import cifar_cnn_3conv, cifar_cnn_3conv_specific, cifar_cnn_3conv_shared
-from models.cifar_resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152
+from models.cifar_resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, ResNet18_YWX
 from models.mnist_cnn import mnist_lenet, mnist_cnn
 from models.mnist_logistic import LogisticRegression
 import torch.optim as optim
@@ -96,6 +96,7 @@ class MTL_Model(object):
         self.shared_layers.load_state_dict(new_shared_layers)
 
 def initialize_model(args, device):
+    global shared_layers, specific_layers
     if args.mtl_model:
         print('Using different task specific layer for each user')
         if args.dataset == 'cifar10':
@@ -119,6 +120,9 @@ def initialize_model(args, device):
                 specific_layers = None
             elif args.model == 'resnet18':
                 shared_layers = ResNet18()
+                specific_layers = None
+            elif args.model == 'resnet18_YWX':
+                shared_layers = ResNet18_YWX()
                 specific_layers = None
             else:
                 raise ValueError('Model not implemented for CIFAR-10')
