@@ -10,15 +10,15 @@ def args_parser():
     parser.add_argument(
         '--dataset',
         type = str,
-        default = 'cifar10',
-        help = 'name of the dataset: mnist, cifar10, femnist, synthetic'
+        default = 'cinic10',
+        help = 'name of the dataset: mnist, cifar10, femnist, synthetic, cinic10'
     )
     parser.add_argument(
         '--model',
         type = str,
         default = 'resnet18_YWX',
         help='name of model. mnist: logistic, lenet, cnn; '
-             'cifar10: resnet18, resnet18_YWX, cnn_complex; femnist: logistic, lenet, cnn; synthetic:lr'
+             'cifar10、cinic10: resnet18, resnet18_YWX, cnn_complex; femnist: logistic, lenet, cnn; synthetic:lr'
     )
     parser.add_argument(
         '--input_channels',
@@ -54,7 +54,7 @@ def args_parser():
     parser.add_argument(
         '--test_ratio',
         type = int,
-        default = 1,
+        default = 0.1,
         help = 'ratio of test dataset'
     )
     # -------------云聚合轮次、边缘聚合轮次、本地更新轮次
@@ -183,7 +183,6 @@ def args_parser():
         help = 'random seed (defaul: 1)'
     )
 
-    # editer: Sensorjang 20230925
     # 设置数据集的根目录为家目录下的 train_data 文件夹
     dataset_root = os.path.join(os.path.expanduser('~'), 'train_data')
     if not os.path.exists(dataset_root):

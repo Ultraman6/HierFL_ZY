@@ -633,7 +633,7 @@ def show_distribution(dataloader, args):
         Percentage of each class of the label.
     """
     # Retrieve labels
-    if args.dataset in ['femnist', 'cifar10', 'mnist', 'synthetic']:
+    if args.dataset in ['femnist', 'cifar10', 'mnist', 'synthetic', 'cinic10']:
         labels = [label for _, label in dataloader.dataset]
     elif args.dataset == 'fsdd':
         labels = dataloader.dataset.labels

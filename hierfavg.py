@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from torch import multiprocessing
 
 from average import models_are_equal
+from models.synthetic_logistic import LogisticRegression_SYNTHETIC
 from options import args_parser
 from tensorboardX import SummaryWriter
 import torch
@@ -21,7 +22,7 @@ from tqdm import tqdm
 from models.mnist_cnn import mnist_lenet, mnist_cnn
 from models.cifar_cnn_3conv_layer import cifar_cnn_3conv
 from models.cifar_resnet import ResNet18, ResNet18_YWX
-from models.mnist_logistic import LogisticRegression
+from models.mnist_logistic import LogisticRegression_MNIST
 import os
 import torch.multiprocessing as mp
 
@@ -199,7 +200,7 @@ def initialize_global_nn(args):
         if args.model == 'lenet':
             global_nn = mnist_lenet(input_channels=1, output_channels=10)
         elif args.model == 'logistic':
-            global_nn = LogisticRegression(input_dim=1, output_dim=10)
+            global_nn = LogisticRegression_MNIST(input_dim=1, output_dim=10)
         elif args.model == 'cnn':
             global_nn = mnist_cnn(input_channels=1, output_channels=10)
         else:
@@ -208,12 +209,12 @@ def initialize_global_nn(args):
         if args.model == 'lenet':
             global_nn = mnist_lenet(input_channels=1, output_channels=62)
         elif args.model == 'logistic':
-            global_nn = LogisticRegression(input_dim=1, output_dim=62)
+            global_nn = LogisticRegression_MNIST(input_dim=1, output_dim=62)
         elif args.model == 'cnn':
             global_nn = mnist_cnn(input_channels=1, output_channels=62)
         else:
             raise ValueError(f"Model{args.model} not implemented for femnist")
-    elif args.dataset == 'cifar10':
+    elif args.dataset == 'cifar10' or 'cinic10':
         if args.model == 'cnn_complex':
             global_nn = cifar_cnn_3conv(input_channels=3, output_channels=10)
         elif args.model == 'resnet18':
@@ -224,7 +225,7 @@ def initialize_global_nn(args):
             raise ValueError(f"Model{args.model} not implemented for cifar")
     elif args.dataset == 'synthetic':
         if args.model == 'logistic':
-            global_nn = LogisticRegression(args.dimension, args.num_class)
+            global_nn = LogisticRegression_SYNTHETIC(args.dimension, args.num_class)
     else:
         raise ValueError(f"Dataset {args.dataset} Not implemented")
     return global_nn

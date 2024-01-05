@@ -4,10 +4,11 @@
 from models.cifar_cnn_3conv_layer import cifar_cnn_3conv, cifar_cnn_3conv_specific, cifar_cnn_3conv_shared
 from models.cifar_resnet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152, ResNet18_YWX
 from models.mnist_cnn import mnist_lenet, mnist_cnn
-from models.mnist_logistic import LogisticRegression
+from models.mnist_logistic import LogisticRegression_MNIST
 import torch.optim as optim
 import torch.nn as nn
 
+from models.synthetic_logistic import LogisticRegression_SYNTHETIC
 # following import is used for tesing the function of this part, they can be deleted if you delete the main() funciton
 from options import args_parser
 import torch
@@ -114,7 +115,7 @@ def initialize_model(args, device):
             specific_layers = specific_layers.cuda(device)
     elif args.global_model:
         print('Using same global model for all users')
-        if args.dataset == 'cifar10':
+        if args.dataset == 'cifar10' or 'cinic10':
             if args.model == 'cnn_complex':
                 shared_layers = cifar_cnn_3conv(input_channels=3, output_channels=10)
                 specific_layers = None
@@ -131,7 +132,7 @@ def initialize_model(args, device):
                shared_layers = mnist_lenet(input_channels=1, output_channels=62)
                specific_layers = None
             elif args.model == 'logistic':
-               shared_layers = LogisticRegression(input_dim=1, output_dim=62)
+               shared_layers = LogisticRegression_MNIST(input_dim=1, output_dim=62)
                specific_layers = None
             elif args.model == 'cnn':
                 shared_layers =  mnist_cnn(input_channels=1, output_channels=62)
@@ -143,7 +144,7 @@ def initialize_model(args, device):
                shared_layers = mnist_lenet(input_channels=1, output_channels=10)
                specific_layers = None
             elif args.model == 'logistic':
-               shared_layers = LogisticRegression(input_dim=1, output_dim=10)
+               shared_layers = LogisticRegression_MNIST(input_dim=1, output_dim=10)
                specific_layers = None
             elif args.model == 'cnn':
                 shared_layers =  mnist_cnn(input_channels=1, output_channels=10)
@@ -152,7 +153,7 @@ def initialize_model(args, device):
                 raise ValueError('Model not implemented for MNIST')
         elif args.dataset == 'synthetic':
             if args.model == 'logistic':
-               shared_layers = LogisticRegression(args.dimension, args.num_class)
+               shared_layers = LogisticRegression_SYNTHETIC(args.dimension, args.num_class)
                specific_layers = None
         else:
             raise ValueError('The dataset is not implemented for mtl yet')

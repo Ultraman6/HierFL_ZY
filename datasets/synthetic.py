@@ -13,7 +13,6 @@ def softmax(x):
 
 def generate_synthetic(alpha, beta, iid, dimension, NUM_CLASS, NUM_USER):
 
-
     samples_per_user = np.random.lognormal(4, 2, (NUM_USER)).astype(int) + 50
     print(samples_per_user)
 
