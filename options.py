@@ -18,7 +18,7 @@ def args_parser():
         type = str,
         default = 'resnet18_YWX',
         help='name of model. mnist: logistic, lenet, cnn; '
-             'cifar10: resnet18, cnn_complex; femnist: logistic, lenet, cnn; synthetic:lr'
+             'cifar10: resnet18, resnet18_YWX, cnn_complex; femnist: logistic, lenet, cnn; synthetic:lr'
     )
     parser.add_argument(
         '--input_channels',
@@ -116,22 +116,8 @@ def args_parser():
     parser.add_argument(
         '--iid',
         type = int,
-        default = -2,
+        default = -3,
         help = 'distribution of the data, 1,0,-1,-2 分别表示iid同大小、niid同大小、iid不同大小、niid同大小且仅一类(one-class)'
-    )
-    # parser.add_argument(
-    #     '--partition_alpha',
-    #     type = int,
-    #     default = 0.5,
-    #     help = 'experiment_niid_level = 1 means that the data is niid '
-    # )
-    parser.add_argument(
-        '--niid_level',
-        type = int,
-        default = 0,
-        help = 'experiment_niid_level = 1 means that the data is niid '
-               'experiment_niid_level = 0 means that the data is iid'
-               'experiment_niid_level = (0,1) e.g. 0.7 means that the data is partially niid'
     )
     # 缓解niid策略——每个edge共享数据给足下客户
     parser.add_argument(
@@ -330,6 +316,21 @@ def args_parser():
         type = str,
         default = "flip",
         help = 'mode of attack, such as: zero、random、flip'
+    )
+
+    # 新~数据划分方法
+    parser.add_argument(
+        '--partition',
+        type = str,
+        default = 'noniid-labeldir',
+        help = '划分类型，homo、 noniid-labeldir、 noniid-#label1、 iid-diff-quantity, '
+               '其中label后的数字表示每个客户的类别数'
+    )
+    parser.add_argument(
+        '--beta_new',
+        type = float,
+        default = 10,
+        help = 'dir分布的超参数'
     )
 
     args = parser.parse_args()

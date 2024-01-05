@@ -314,13 +314,11 @@ def HierFAVG(args):
             client_class_dis = get_client_class(args, clients)
             edges, p_clients = initialize_edges_iid(num_edges=args.num_edges,
                                                     clients=clients,
-                                                    # args=args,
                                                     client_class_dis=client_class_dis)
         elif args.edgeiid == 0:
             client_class_dis = get_client_class(args, clients)
             edges, p_clients = initialize_edges_niid(num_edges=args.num_edges,
                                                      clients=clients,
-                                                     # args=args,
                                                      client_class_dis=client_class_dis)
         else:
             # This is randomly assign the clients to edges
@@ -342,9 +340,9 @@ def HierFAVG(args):
                 print(f"Edge {i} has selfish clients {selfish_cids}")
 
                 cids = list(set(cids) - set(selected_cids))
-                edges.append(Edge(id=i, cids=selected_cids, scids=selfish_cids,
+                edges.append(Edge(id=i, cids=selected_cids,
                                   shared_layers=copy.deepcopy(clients[0].model.shared_layers),
-                                  share_dataloader=share_loaders[i]))
+                                  scids=selfish_cids, share_dataloader=share_loaders[i]))
 
                 # 注册客户信息并按需把共享数据集给到客户端
                 for cid in selected_cids:
@@ -367,9 +365,14 @@ def HierFAVG(args):
                     selected_cids = np.random.choice(cids, clients_per_edge, replace=False)
             print(f"Edge {i} has clients {selected_cids}")
             cids = list(set(cids) - set(selected_cids))
+            if args.attack_flag == 1:  # 如果开启了模型攻击，就要构造每个edge的scids
+                selfish_cids = attack_mapping[str(i)]
+            else:
+                selfish_cids = []
+            print(f"Edge {i} has selfish clients {selfish_cids}")
             edges.append(Edge(id=i, cids=selected_cids,
                               shared_layers=copy.deepcopy(clients[0].model.shared_layers),
-                              share_dataloader=share_loaders[i]))
+                              scids=selfish_cids, share_dataloader=share_loaders[i]))
 
             # 注册客户信息并按需把共享数据集给到客户端
             for cid in selected_cids:

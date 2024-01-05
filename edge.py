@@ -14,7 +14,7 @@ from average import average_weights, models_are_equal
 
 class Edge():
 
-    def __init__(self, id, cids, scids, shared_layers, share_dataloader=None):
+    def __init__(self, id, cids, shared_layers, scids=None, share_dataloader=None):
         """
         id: edge id
         cids: ids of the clients under this edge

@@ -287,43 +287,130 @@ def niid_esize_split_test_large(dataset, args, kwargs, split_pattern, is_shuffle
     return data_loaders, None
 
 
+def partition_completed(dataset, args, kwargs, is_shuffle=True):
+    global proportions, net_dataidx_map, idx_batch
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+
+    n_train = len(dataset)
+    y_train = np.array(dataset.targets)
+
+    if args.partition == "homo":
+        idxs = np.random.permutation(n_train)
+        batch_idxs = np.array_split(idxs, args.num_clients)
+        net_dataidx_map = {i: batch_idxs[i] for i in range(args.num_clients)}
+
+    elif args.partition == "noniid-labeldir":
+        min_size = 0
+        min_require_size = 10
+
+        # N = dataset.shape[0]
+        net_dataidx_map = {}
+
+        while min_size < min_require_size:
+            idx_batch = [[] for _ in range(args.num_clients)]
+            for k in range(args.num_class):
+                idx_k = np.where(y_train == k)[0]
+                np.random.shuffle(idx_k)
+                proportions = np.random.dirichlet(np.repeat(args.beta_new, args.num_clients))
+                # logger.info("proportions1: ", proportions)
+                # logger.info("sum pro1:", np.sum(proportions))
+                ## Balance
+                proportions = np.array([p * (len(idx_j) < n_train / args.num_clients) for p, idx_j in zip(proportions, idx_batch)])
+                # logger.info("proportions2: ", proportions)
+                proportions = proportions / proportions.sum()
+                # logger.info("proportions3: ", proportions)
+                proportions = (np.cumsum(proportions) * len(idx_k)).astype(int)[:-1]
+                # logger.info("proportions4: ", proportions)
+                idx_batch = [idx_j + idx.tolist() for idx_j, idx in zip(idx_batch, np.split(idx_k, proportions))]
+                min_size = min([len(idx_j) for idx_j in idx_batch])
+                # if K == 2 and n_parties <= 10:
+                #     if np.min(proportions) < 200:
+                #         min_size = 0
+                #         break
+        for j in range(args.num_clients):
+            np.random.shuffle(idx_batch[j])
+            net_dataidx_map[j] = idx_batch[j]
+
+    elif args.partition > "noniid-#label0" and args.partition <= "noniid-#label9":
+        num = eval(args.partition[13:])
+        times=[0 for _ in range(args.num_class)]
+        contain=[]
+        for i in range(args.num_clients):
+            current=[i % args.num_class]
+            times[i % args.num_class]+=1
+            j=1
+            while (j<num):
+                ind=random.randint(0, args.num_class - 1)
+                if ind not in current:
+                    j=j+1
+                    current.append(ind)
+                    times[ind]+=1
+            contain.append(current)
+        net_dataidx_map ={i:np.ndarray(0,dtype=np.int64) for i in range(args.num_clients)}
+        for i in range(args.num_class):
+            idx_k = np.where(y_train==i)[0]
+            np.random.shuffle(idx_k)
+            split = np.array_split(idx_k,times[i])
+            ids=0
+            for j in range(args.num_clients):
+                if i in contain[j]:
+                    net_dataidx_map[j]=np.append(net_dataidx_map[j],split[ids])
+                    ids+=1
+        for i in range(args.num_clients):
+            net_dataidx_map[i] = net_dataidx_map[i].tolist()
+
+    elif args.partition == "iid-diff-quantity":
+        idxs = np.random.permutation(n_train)
+        min_size = 0
+        while min_size < 10:
+            proportions = np.random.dirichlet(np.repeat(args.beta_new, args.num_clients))
+            proportions = proportions/proportions.sum()
+            min_size = np.min(proportions*len(idxs))
+        proportions = (np.cumsum(proportions)*len(idxs)).astype(int)[:-1]
+        batch_idxs = np.split(idxs,proportions)
+        net_dataidx_map = {i: batch_idxs[i] for i in range(args.num_clients)}
+        for i in range(args.num_clients):
+            net_dataidx_map[i] = net_dataidx_map[i].tolist()
+
+    data_loaders = []
+    for client_id in net_dataidx_map:
+        client_dataset = DatasetSplit(dataset, net_dataidx_map[client_id])
+        client_loader = DataLoader(client_dataset, batch_size=args.train_batch_size, shuffle=is_shuffle, **kwargs)
+        data_loaders.append(client_loader)
+
+    return data_loaders
+
 def niid_esize_split_oneclass(dataset, args, kwargs, is_shuffle=True):
-    data_loaders = [0] * args.num_clients
-    # one class perclients
-    # any requirements on the number of clients?
-    num_shards = args.num_clients
-    num_imgs = int(len(dataset) / num_shards)
-    idx_shard = [i for i in range(num_shards)]
-    dict_users = {i: np.array([]) for i in range(args.num_clients)}
-    idxs = np.arange(num_shards * num_imgs)
+    num_clients = args.num_clients
+    num_shards = args.num_shards
+    labels = np.array(dataset.targets)
+    total_data = len(labels)
 
-    if args.dataset != "femnist":
-        # original
-        # editer: Ultraman6 20230928
-        # torch>=1.4.0
-        labels = dataset.targets
-        idxs_labels = np.vstack((idxs, labels))
-        idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
-        idxs = idxs_labels[0, :]
-        idxs = idxs.astype(int)
-    else:
-        # custom
-        labels = np.array(dataset.targets)  # 将labels转换为NumPy数组
-        idxs_labels = np.vstack((idxs[:len(labels)], labels[:len(idxs)]))
-        idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
-        idxs = idxs_labels[0, :]
-        idxs = idxs.astype(int)
+    # 根据标签排序数据集
+    idxs = np.arange(total_data)
+    idxs_labels = np.vstack((idxs, labels))
+    idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
+    idxs = idxs_labels[0, :]
 
-    # divide and assign
-    for i in range(args.num_clients):
-        rand_set = set(np.random.choice(idx_shard, 1, replace=False))
-        idx_shard = list(set(idx_shard) - rand_set)
-        for rand in rand_set:
-            dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs: (rand + 1) * num_imgs]), axis=0)
-            dict_users[i] = dict_users[i].astype(int)
-        data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
-                                     batch_size=args.train_batch_size,
-                                     shuffle=is_shuffle, **kwargs)
+    # 将数据集分割成多个分片
+    shard_size = total_data // num_shards
+    shards = [idxs[i:i + shard_size] for i in range(0, total_data, shard_size)]
+
+    # 确保每个客户端获得单一标签的数据
+    dict_users = {i: np.array([]) for i in range(num_clients)}
+    for client_id in range(num_clients):
+        selected_shards = np.random.choice(range(num_shards), num_shards // num_clients, replace=False)
+        for shard in selected_shards:
+            dict_users[client_id] = np.concatenate((dict_users[client_id], shards[shard]), axis=0)
+
+    # 创建数据加载器
+    data_loaders = []
+    for client_id in range(num_clients):
+        client_dataset = DatasetSplit(dataset, dict_users[client_id])
+        client_loader = DataLoader(client_dataset, batch_size=args.train_batch_size, shuffle=is_shuffle, **kwargs)
+        data_loaders.append(client_loader)
+
     return data_loaders
 
 
@@ -340,6 +427,8 @@ def split_data(dataset, args, kwargs, is_shuffle=True):
         data_loaders = iid_nesize_split(dataset, args, kwargs, is_shuffle)
     elif args.iid == -2:
         data_loaders = niid_esize_split_oneclass(dataset, args, kwargs, is_shuffle)
+    elif args.iid == -3: # 开启新划分方法
+        data_loaders = partition_completed(dataset, args, kwargs, is_shuffle)
     else:
         raise ValueError('Data Distribution pattern `{}` not implemented '.format(args.iid))
     return data_loaders
@@ -452,7 +541,7 @@ def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_comple
                             download=True, transform=transform_test)
 
     # 根据 args.share_niid 的值创建共享数据加载器
-    if args.share_niid == 1:
+    if args.niid_share == 1:
         share_loaders = create_shared_data_loaders(train, args)
     else:
         share_loaders = [None] * args.num_edges

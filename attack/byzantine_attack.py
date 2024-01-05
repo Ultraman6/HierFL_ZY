@@ -37,9 +37,9 @@ def attack_zero_mode(model_list, byzantine_idxs, device):
                 if is_weight_param(k):
                     local_model_params[k] = torch.zeros(local_model_params[k].size(), device=device)
             new_model_list.append((num, local_model_params))
+            print("client {} 发动zero攻击".format(cid))
         else:
             new_model_list.append(model_list[cid])
-        print("client {} 发动zero攻击".format(cid))
     return new_model_list
 
 def attack_random_mode(model_list, byzantine_idxs, device):
@@ -51,9 +51,9 @@ def attack_random_mode(model_list, byzantine_idxs, device):
                 if is_weight_param(k):
                     local_model_params[k] = torch.from_numpy(2 * np.random.random_sample(local_model_params[k].size()) - 1).float().to(device)
             new_model_list.append((num, local_model_params))
+            print("client {} 发动random攻击".format(cid))
         else:
             new_model_list.append(model_list[cid])
-        print("client {} 发动random攻击".format(cid))
     return new_model_list
 
 def attack_flip_mode(model_list, byzantine_idxs, device):
@@ -67,7 +67,7 @@ def attack_flip_mode(model_list, byzantine_idxs, device):
                 if is_weight_param(k):
                     local_model_params[k] = 2 * global_model[k].to(device) - local_model_params[k].to(device)
             new_model_list.append((num, local_model_params))
+            print("client {} 发动flip攻击".format(cid))
         else:
             new_model_list.append(model_list[cid])
-        print("client {} 发动flip攻击".format(cid))
     return new_model_list
