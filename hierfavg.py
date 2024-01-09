@@ -214,7 +214,7 @@ def initialize_global_nn(args):
             global_nn = mnist_cnn(input_channels=1, output_channels=62)
         else:
             raise ValueError(f"Model{args.model} not implemented for femnist")
-    elif args.dataset == 'cifar10' or 'cinic10':
+    elif args.dataset == 'cifar10' or args.dataset == 'cinic10':
         if args.model == 'cnn_complex':
             global_nn = cifar_cnn_3conv(input_channels=3, output_channels=10)
         elif args.model == 'resnet18':
@@ -416,7 +416,7 @@ def HierFAVG(args):
             edge_loss = [0.0] * len(edges)
             edge_sample = [0] * len(edges)
             for edge in edges:
-                edge_thread = Thread(target=process_edge, args=(edge, clients, args, device, edge_loss, edge_sample))
+                edge_thread = Thread(target=process_edge, args=(edge, clients, args, device, edge_loss, edge_sample, num_comm))
                 edge_threads.append(edge_thread)
                 edge_thread.start()
             for edge_thread in edge_threads:
@@ -446,6 +446,16 @@ def HierFAVG(args):
         correct_all_v, total_all_v = fast_all_clients_test(v_test_loader, global_nn, device)
         avg_acc_v = correct_all_v / total_all_v  # 测试精度
         print('Cloud Valid Accuracy {}'.format(avg_acc_v))
+
+        # 保存云端精度数据
+        with open('accs_cloud_data.txt', 'a') as file:
+            file.write(str(avg_acc_v) + '\n')
+        print("数据已保存到 accs_cloud_data.txt 文件中。")
+        # 保存时间数据
+        with open('times_data.txt', 'a') as file:
+            file.write(str(time.time() - start_time) + '\n')
+        print("time数据已保存到 times_data.txt 文件中。")
+
         # 在轮次结束时记录相对于开始时间的时间差, 记录云端轮的测试精度
         times.append(time.time() - start_time)
         accs_cloud.append(avg_acc_v)
@@ -475,7 +485,7 @@ def train_client(client, edge, num_iter, device, return_dict, client_id):
     return_dict[client_id] = client_loss
     # print(f"Client {client.id} 本地迭代结束")
 
-def process_edge(edge, clients, args, device, edge_loss, edge_sample):
+def process_edge(edge, clients, args, device, edge_loss, edge_sample, num_comm):
     # 一次边缘迭更新 = n个本地迭代+ 一次边缘聚合
     # print(f"Edge {edge.id} 边缘更新开始")
     # 使用多线程进行客户迭代
@@ -492,7 +502,7 @@ def process_edge(edge, clients, args, device, edge_loss, edge_sample):
         thread.join()
     # 边缘聚合
     # print(f"Edge {edge.id} 边缘聚合开始")
-    edge.aggregate(args, device)
+    edge.aggregate(args, device, num_comm)
     # print(f"Edge {edge.id} 边缘聚合结束")
     # 更新边缘训练损失
     edge_loss[edge.id] = sum(return_dict.values())

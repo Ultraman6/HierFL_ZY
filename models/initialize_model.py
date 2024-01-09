@@ -115,7 +115,7 @@ def initialize_model(args, device):
             specific_layers = specific_layers.cuda(device)
     elif args.global_model:
         print('Using same global model for all users')
-        if args.dataset == 'cifar10' or 'cinic10':
+        if args.dataset == 'cifar10' or args.dataset == 'cinic10':
             if args.model == 'cnn_complex':
                 shared_layers = cifar_cnn_3conv(input_channels=3, output_channels=10)
                 specific_layers = None
