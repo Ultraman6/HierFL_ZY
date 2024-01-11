@@ -136,7 +136,7 @@ def niid_esize_split(dataset, args, kwargs, is_shuffle=True):
         # original
         # editer: Ultraman6 20230928
         # torch>=1.4.0
-        labels = dataset.targets
+        labels = np.array(dataset.labels)
         idxs_labels = np.vstack((idxs, labels))
         idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
         # sort the data according to their label
@@ -538,6 +538,69 @@ def get_cifar10(dataset_root, args):  # cifa10数据集下只能使用cnn_comple
     train = datasets.CIFAR10(os.path.join(dataset_root, 'cifar10'), train=True,
                              download=True, transform=transform_train)
     test = datasets.CIFAR10(os.path.join(dataset_root, 'cifar10'), train=False,
+                            download=True, transform=transform_test)
+
+    # 根据 args.share_niid 的值创建共享数据加载器
+    if args.niid_share == 1:
+        share_loaders = create_shared_data_loaders(train, args)
+    else:
+        share_loaders = [None] * args.num_edges
+
+    test_set_size = len(test)
+    subset_size = int(test_set_size * args.test_ratio)  # 例如，保留20%的数据
+    # 生成随机索引来创建子集
+    indices = list(range(test_set_size))
+    subset_indices = random.sample(indices, subset_size)
+    # 创建子集
+    subset = Subset(test, subset_indices)
+    # 使用子集创建 DataLoader
+    v_test_loader = DataLoader(subset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
+
+    train_loaders = split_data(train, args, kwargs)
+
+    test_loaders = []
+    if args.test_on_all_samples == 1:
+        # 将整个测试集分配给每个客户端
+        for i in range(args.num_clients):
+            test_loader = torch.utils.data.DataLoader(
+                test, batch_size=args.test_batch_size, shuffle=False, **kwargs
+            )
+            test_loaders.append(test_loader)
+    else:
+        test_loaders = split_data(test, args, kwargs)
+
+    return train_loaders, test_loaders, share_loaders, v_test_loader
+
+def get_SVHN(dataset_root, args):
+    is_cuda = args.cuda
+    kwargs = {'num_workers': args.num_workers, 'pin_memory': True} if is_cuda else {}
+    if args.model == 'cnn_complex':
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4377, 0.4438, 0.4728), (0.1980, 0.2010, 0.1970)),
+        ])
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.4377, 0.4438, 0.4728), (0.1980, 0.2010, 0.1970)),
+        ])
+    elif args.model == 'resnet18' or 'resnet18_YWX':
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+    else:
+        raise ValueError("this nn for cifar10 not implemented")
+    train = datasets.SVHN(os.path.join(dataset_root, 'SVHN'), split = "train",
+                             download=True, transform=transform_train)
+    test = datasets.SVHN(os.path.join(dataset_root, 'SVHN'),split = "test",
                             download=True, transform=transform_test)
 
     # 根据 args.share_niid 的值创建共享数据加载器

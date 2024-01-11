@@ -62,12 +62,15 @@ class Edge():
     def aggregate(self, args, device, num_comm):
         # Check if the attack is enabled and perform the attack if necessary
         global count
-        if args.attack_flag == 1:  # 判断是否开启模型攻击
+        if args.attack_flag == 1 :  # 判断是否开启模型攻击
             count = 4
             if num_comm % count == 0:
-                print("倍数TEST,count是多少", num_comm, "\n")
+                # print("倍数TEST,count是多少", num_comm, "\n")
                 attack_mode = args.attack_mode  # 构造字典，包含每个客户的数据量和本地模型参数
                 received_dict = {cid:(self.sample_registration[cid], dict) for cid, dict in self.receiver_buffer.items()}
+                for scid in received_dict.keys():
+                    if args.TFL == 1 and scid in self.scids:
+                        self.scids.remove(scid)
                 self.shared_state_dict = average_weights(perform_byzantine_attack(received_dict, self.scids, attack_mode, device))
                 # model_list = perform_byzantine_attack(received_dict, self.scids, attack_mode, device)
                 # self.shared_state_dict = average_weights(model_list)

@@ -10,13 +10,13 @@ def args_parser():
     parser.add_argument(
         '--dataset',
         type = str,
-        default = 'cinic10',
-        help = 'name of the dataset: mnist, cifar10, femnist, synthetic, cinic10'
+        default = 'SVHN',
+        help = 'name of the dataset: mnist, cifar10, femnist, synthetic, cinic10, SVHN'
     )
     parser.add_argument(
         '--model',
         type = str,
-        default = 'resnet18_YWX',
+        default = 'cnn_complex',
         help='name of model. mnist: logistic, lenet, cnn; '
              'cifar10、cinic10: resnet18, resnet18_YWX, cnn_complex; femnist: logistic, lenet, cnn; synthetic:lr'
     )
@@ -48,7 +48,7 @@ def args_parser():
     parser.add_argument(
         '--num_workers',
         type = int,
-        default = 4,
+        default = 1,
         help = 'numworks for dataloader'
     )
     parser.add_argument(
@@ -85,7 +85,7 @@ def args_parser():
     parser.add_argument(
         '--lr_decay',
         type = float,
-        default= '0',
+        default= '1',
         help = 'lr decay rate'
     )
     parser.add_argument(
@@ -116,7 +116,7 @@ def args_parser():
     parser.add_argument(
         '--iid',
         type = int,
-        default = -3,
+        default = 0,
         help = 'distribution of the data, 1,0,-1,-2 分别表示iid同大小、niid同大小、iid不同大小、niid同大小且仅一类(one-class)'
     )
     # 缓解niid策略——每个edge共享数据给足下客户
@@ -184,7 +184,7 @@ def args_parser():
     )
 
     # 设置数据集的根目录为家目录下的 train_data 文件夹
-    dataset_root = os.path.join(os.path.expanduser('~'), 'train_data')
+    dataset_root = os.path.join(os.getcwd(), 'train_data')
     if not os.path.exists(dataset_root):
         os.makedirs(dataset_root)
 
@@ -233,7 +233,7 @@ def args_parser():
     parser.add_argument(
         '--test_on_all_samples',
         type = int,
-        default = 1,
+        default = 0,
         help = '1 means test on all samples, 0 means test samples will be split averagely to each client'
     )
     # 定义edges及其下属clients的映射关系
@@ -302,6 +302,15 @@ def args_parser():
         "1": [3],
         "2": [8],
     }
+
+    # 基线对比
+    parser.add_argument(
+        '--TFL',
+        type = int,
+        default = 0,
+        help = 'trigger of baseline, 1 means on 0 means off'
+    )
+
     # 将映射关系转换为JSON格式
     attack_mapping_json = json.dumps(attack_mapping)
     parser.add_argument(
@@ -313,7 +322,7 @@ def args_parser():
     parser.add_argument(
         '--attack_mode',
         type = str,
-        default = "flip",
+        default = "zero",
         help = 'mode of attack, such as: zero、random、flip'
     )
 

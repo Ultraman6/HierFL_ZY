@@ -1,4 +1,4 @@
-from datasets.cifar_mnist import show_distribution, get_mnist, get_cifar10, get_femnist
+from datasets.cifar_mnist import show_distribution, get_mnist, get_cifar10, get_femnist, get_SVHN
 from datasets.cinic10 import get_cinic10
 from datasets.synthetic import get_synthetic
 
@@ -13,6 +13,8 @@ def get_dataset(dataset_root, dataset, args):
         train_loaders, test_loaders, share_data_edge, v_test_loader = get_cinic10(dataset_root, args)
     elif dataset == 'femnist':
         train_loaders, test_loaders, share_data_edge, v_test_loader = get_femnist(dataset_root, args)
+    elif dataset == 'SVHN':
+        train_loaders, test_loaders, share_data_edge, v_test_loader = get_SVHN(dataset_root, args)
     elif dataset == 'synthetic':
         train_loaders, test_loaders, share_data_edge, v_test_loader = get_synthetic(args)
     else:
@@ -24,7 +26,7 @@ def get_dataloaders(args):
     :param args:
     :return: A list of trainloaders, a list of testloaders, a concatenated trainloader and a concatenated testloader
     """
-    if args.dataset in ['mnist', 'cifar10', "femnist", "synthetic", "cinic10"]:
+    if args.dataset in ['mnist', 'cifar10', "femnist", "synthetic", "cinic10", "SVHN"]:
         train_loaders, test_loaders, share_data_edge, v_test_loader = get_dataset(dataset_root=args.dataset_root,
                                                                                        dataset=args.dataset,
                                                                                        args = args)
