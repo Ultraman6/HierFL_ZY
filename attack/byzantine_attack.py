@@ -42,14 +42,18 @@ def attack_zero_mode(model_list, byzantine_idxs, device):
             new_model_list.append(model_list[cid])
     return new_model_list
 
-def attack_random_mode(model_list, byzantine_idxs, device):
+def attack_random_mode(model_list, byzantine_idxs, device, scale=0.1, sparsity=0.5):
     new_model_list = []
     for cid in model_list.keys():
         if cid in byzantine_idxs:
             num, local_model_params = model_list[cid]
             for k in local_model_params.keys():
                 if is_weight_param(k):
-                    local_model_params[k] = torch.from_numpy(2 * np.random.random_sample(local_model_params[k].size()) - 1).float().to(device)
+                    # 为每个参数生成独立的随机梯度（随机种子）
+                    mask = np.random.binomial(1, sparsity, local_model_params[k].size())
+                    random_values = scale * (2 * np.random.random_sample(local_model_params[k].size()) - 1)
+                    random_tensor = torch.from_numpy(random_values * mask).float().to(device)
+                    local_model_params[k] = local_model_params[k] + random_tensor
             new_model_list.append((num, local_model_params))
             print("client {} 发动random攻击".format(cid))
         else:

@@ -10,7 +10,7 @@ def args_parser():
     parser.add_argument(
         '--dataset',
         type = str,
-        default = 'SVHN',
+        default = 'cifar10',
         help = 'name of the dataset: mnist, cifar10, femnist, synthetic, cinic10, SVHN'
     )
     parser.add_argument(
@@ -288,7 +288,13 @@ def args_parser():
         default = 10,
         help = '1 means mapping is active, 0 means mapping is inactive'
     )
-
+    # 基线对比
+    parser.add_argument(
+        '--TFL',
+        type = int,
+        default = 0,
+        help = 'trigger of baseline, 1 means on 0 means off'
+    )
 
     # 模型攻击参数
     parser.add_argument(
@@ -302,15 +308,6 @@ def args_parser():
         "1": [3],
         "2": [8],
     }
-
-    # 基线对比
-    parser.add_argument(
-        '--TFL',
-        type = int,
-        default = 0,
-        help = 'trigger of baseline, 1 means on 0 means off'
-    )
-
     # 将映射关系转换为JSON格式
     attack_mapping_json = json.dumps(attack_mapping)
     parser.add_argument(
@@ -322,7 +319,7 @@ def args_parser():
     parser.add_argument(
         '--attack_mode',
         type = str,
-        default = "zero",
+        default = "random",
         help = 'mode of attack, such as: zero、random、flip'
     )
 
