@@ -214,7 +214,7 @@ def initialize_global_nn(args):
             global_nn = mnist_cnn(input_channels=1, output_channels=62)
         else:
             raise ValueError(f"Model{args.model} not implemented for femnist")
-    elif args.dataset == 'cifar10' or args.dataset == 'cinic10':
+    elif args.dataset == 'cifar10' or args.dataset == 'cinic10' or args.dataset == 'SVHN':
         if args.model == 'cnn_complex':
             global_nn = cifar_cnn_3conv(input_channels=3, output_channels=10)
         elif args.model == 'resnet18':

@@ -121,46 +121,50 @@ def iid_nesize_split(dataset, args, kwargs, is_shuffle=True):
     return data_loaders
 
 
+from torchvision import transforms
+
+
+from torchvision import transforms
+
 def niid_esize_split(dataset, args, kwargs, is_shuffle=True):
     data_loaders = [0] * args.num_clients
-    # each client has only two classes of the network
     num_shards = 2 * args.num_clients
-    # the number of images in one shard
-    num_imgs = int(len(dataset) / num_shards)
-    idx_shard = [i for i in range(num_shards)]
+    num_imgs_per_shard = int(len(dataset) / num_shards)
+
     dict_users = {i: np.array([]) for i in range(args.num_clients)}
-    idxs = np.arange(num_shards * num_imgs)
-    # is_shuffle is used to differentiate between train and test
 
     if args.dataset != "femnist":
-        # original
-        # editer: Ultraman6 20230928
-        # torch>=1.4.0
         labels = np.array(dataset.labels)
-        idxs_labels = np.vstack((idxs, labels))
-        idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
-        # sort the data according to their label
-        idxs = idxs_labels[0, :]
-        idxs = idxs.astype(int)
     else:
-        # custom
-        labels = np.array(dataset.targets)  # 将labels转换为NumPy数组
-        idxs_labels = np.vstack((idxs[:len(labels)], labels[:len(idxs)]))
-        idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
-        idxs = idxs_labels[0, :]
-        idxs = idxs.astype(int)
+        labels = np.array(dataset.targets)
 
-    # divide and assign
+    idxs = np.arange(len(labels))
+    idxs_labels = np.vstack((idxs, labels))
+    idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
+    idxs = idxs_labels[0, :]
+
+    idx_shard = [i for i in range(num_shards)]
     for i in range(args.num_clients):
         rand_set = set(np.random.choice(idx_shard, 2, replace=False))
-        idx_shard = list(set(idx_shard) - rand_set)
         for rand in rand_set:
-            dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs: (rand + 1) * num_imgs]), axis=0)
-            dict_users[i] = dict_users[i].astype(int)
+            start_idx = rand * num_imgs_per_shard
+            end_idx = start_idx + num_imgs_per_shard
+            shard_data = idxs[start_idx:end_idx]
+
+            # 如果分片数据不足，进行复用
+            if len(shard_data) < num_imgs_per_shard:
+                extra_data = np.random.choice(shard_data, num_imgs_per_shard - len(shard_data), replace=True)
+                shard_data = np.concatenate((shard_data, extra_data))
+
+            dict_users[i] = np.concatenate((dict_users[i], shard_data), axis=0)
+
+        dict_users[i] = dict_users[i].astype(int)
         data_loaders[i] = DataLoader(DatasetSplit(dataset, dict_users[i]),
                                      batch_size=args.train_batch_size,
                                      shuffle=is_shuffle, **kwargs)
     return data_loaders
+
+
 
 
 def niid_esize_split_train(dataset, args, kwargs, is_shuffle=True):
@@ -597,7 +601,7 @@ def get_SVHN(dataset_root, args):
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ])
     else:
-        raise ValueError("this nn for cifar10 not implemented")
+        raise ValueError("this nn for SVHN not implemented")
     train = datasets.SVHN(os.path.join(dataset_root, 'SVHN'), split = "train",
                              download=True, transform=transform_train)
     test = datasets.SVHN(os.path.join(dataset_root, 'SVHN'),split = "test",
@@ -696,7 +700,7 @@ def show_distribution(dataloader, args):
         Percentage of each class of the label.
     """
     # Retrieve labels
-    if args.dataset in ['femnist', 'cifar10', 'mnist', 'synthetic', 'cinic10']:
+    if args.dataset in ['femnist', 'cifar10', 'mnist', 'synthetic', 'cinic10', 'SVHN']:
         labels = [label for _, label in dataloader.dataset]
     elif args.dataset == 'fsdd':
         labels = dataloader.dataset.labels

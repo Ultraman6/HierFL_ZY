@@ -116,7 +116,7 @@ def args_parser():
     parser.add_argument(
         '--iid',
         type = int,
-        default = 0,
+        default = 1,
         help = 'distribution of the data, 1,0,-1,-2 分别表示iid同大小、niid同大小、iid不同大小、niid同大小且仅一类(one-class)'
     )
     # 缓解niid策略——每个edge共享数据给足下客户

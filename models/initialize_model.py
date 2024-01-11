@@ -115,7 +115,7 @@ def initialize_model(args, device):
             specific_layers = specific_layers.cuda(device)
     elif args.global_model:
         print('Using same global model for all users')
-        if args.dataset == 'cifar10' or args.dataset == 'cinic10':
+        if args.dataset == 'cifar10' or args.dataset == 'cinic10' or args.dataset == 'SVHN':
             if args.model == 'cnn_complex':
                 shared_layers = cifar_cnn_3conv(input_channels=3, output_channels=10)
                 specific_layers = None
@@ -126,7 +126,7 @@ def initialize_model(args, device):
                 shared_layers = ResNet18_YWX()
                 specific_layers = None
             else:
-                raise ValueError('Model not implemented for CIFAR-10')
+                raise ValueError('Model not implemented for CIFAR-10 or CINIC10 or SVHN')
         elif args.dataset == 'femnist':
             if args.model == 'lenet':
                shared_layers = mnist_lenet(input_channels=1, output_channels=62)
